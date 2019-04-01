@@ -1,0 +1,11 @@
+[package]
+name = "game"
+version = "0.1.0"
+authors = ["mich101mich <mich101mich@gmail.com>"]
+
+[lib]
+name = "game"
+path = "game.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
