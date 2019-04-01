@@ -8,14 +8,14 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/mich101mich/nihon.git"
+		"url": "git+https://github.com/mich101mich/game.git"
 	},
 	"author": "mich101mich",
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/mich101mich/nihon/issues"
+		"url": "https://github.com/mich101mich/game/issues"
 	},
-	"homepage": "https://github.com/mich101mich/nihon#readme",
+	"homepage": "https://github.com/mich101mich/game#readme",
 	"devDependencies": {
 		"ts-loader": "^5.3.3",
 		"webpack": "^4.29.6"
