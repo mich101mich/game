@@ -1,13 +1,11 @@
 
-import { Machine, MachineType } from "../machine";
-import { Collection } from "./collection";
 import { TilePos } from "../geometry/pos";
-import { ItemType } from "../item";
-import { Game } from "../game";
+import { Machine, MachineType } from "../world/machine";
 
-export class Machines implements Iterable<Machine>{
+export class Machines implements Iterable<Machine> {
 	private map: { [index: string]: Machine } = {};
 	private list = new Set<Machine>();
+	private spawnList = new Set<Machine>();
 
 	[Symbol.iterator](): Iterator<Machine> {
 		return this.list[Symbol.iterator]();
@@ -25,17 +23,21 @@ export class Machines implements Iterable<Machine>{
 			return false;
 		}
 		this.map[element.pos.toString()] = element;
+		if (element.type == MachineType.Spawn) {
+			this.spawnList.add(element);
+		}
 		const length = this.count;
 		return this.list.add(element).size > length;
 	}
 
 	remove(element: Machine): boolean {
 		delete this.map[element.pos.toString()];
+		this.spawnList.delete(element);
 		return this.list.delete(element);
 	}
 
-	spawns(): Machine[] {
-		return [...this].filter(m => m.type == MachineType.Spawn);
+	spawns(): Set<Machine> {
+		return this.spawnList
 	}
 
 	at(pos: TilePos): Machine;

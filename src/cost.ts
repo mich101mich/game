@@ -1,7 +1,5 @@
 
-import { Game } from "./game";
-import { ItemType } from "./item";
-import { Machine } from "./machine";
+import { ItemType } from "./world/item";
 
 export class Cost {
 	amount = new Map<ItemType, number>();
@@ -27,25 +25,9 @@ export class Cost {
 				.join(", ")
 			+ ")";
 	}
-	isAvailable() {
-		for (const [type, count] of this.amount) {
-			if (Game.resources.get(type) < count) {
-				return false;
-			}
-		}
-		return true;
-	}
-	pay() {
-		this.amount.forEach((count, type) => {
-			Game.resources.remove(type, count);
-		});
-	}
-	request(target: Machine) {
-		Game.items.request(target, this);
-	}
 	remove(type: ItemType, count = 1) {
 		let current = this.amount.get(type);
-		if (current == undefined) {
+		if (current === undefined) {
 			throw new Error("Attempt to remove non-available ItemType " + ItemType[type] + " from " + this);
 		}
 		current = Math.max(0, current - count);

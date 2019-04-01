@@ -1,6 +1,5 @@
 
-import { Dir } from "./geometry/mod";
-import { TileType } from "./tile";
+import { TileType } from "./world/tile";
 
 export interface Wasm {
 	memory: { buffer: ArrayBuffer };

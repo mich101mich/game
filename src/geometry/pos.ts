@@ -1,5 +1,6 @@
 
 import { Game } from "../game";
+import { World } from "../world/world";
 
 export enum Dir {
 	UP = 0,
@@ -17,19 +18,7 @@ class Pos {
 	 * @param x the x coordinate
 	 * @param y the y coordinate
 	 */
-	constructor(x: number, y: number);
-	/**
-	 * creates a new Pos and converts if necessary
-	 * @param src the source Pos
-	 */
-	constructor(src: TilePos);
-	/**
-	 * creates a new Pos and converts if necessary
-	 * @param src the source Pos
-	 */
-	constructor(src: GamePos);
-
-	constructor(x: number | Pos, y?: number) {
+	constructor(x: number, y: number) {
 		this.set(x, y);
 	}
 
@@ -39,22 +28,10 @@ class Pos {
 	 * @param x the x coordinate or source Pos
 	 * @param y the y coordinate
 	 */
-	set(x: number | Pos = 0, y: number = 0): void {
-		if (!(x instanceof Pos)) {
-			this.x = x;
-			this.y = y;
-			return;
-		}
-		let pos: Pos;
-		if (this instanceof GamePos) {
-			pos = x.toGamePos();
-		} else if (this instanceof TilePos) {
-			pos = x.toTilePos();
-		} else {
-			pos = x;
-		}
-		this.x = pos.x;
-		this.y = pos.y;
+	set(x: number, y: number): Pos {
+		this.x = x;
+		this.y = y;
+		return this;
 	}
 	/**
 	 * moves this Pos by steps in dir
@@ -90,26 +67,41 @@ class Pos {
 	toString(): string {
 		return "(" + this.x + ", " + this.y + ")";
 	}
-	toTilePos(): TilePos {
-		return new TilePos(this.x, this.y);
-	}
-	toGamePos(): GamePos {
-		return new GamePos(this.x, this.y);
-	}
 
 	protected static deltaX = [0, 1, 0, -1, 0];
 	protected static deltaY = [-1, 0, 1, 0, 0];
 }
 
+
 /**
  * a Class to represent Coordinates of Tiles
  */
 export class TilePos extends Pos {
+
+	constructor(x: number, y: number);
+	constructor(pos: TilePos);
+	constructor(x: number | TilePos, y: number = 0) {
+		super(x instanceof Pos ? x.x : x, x instanceof Pos ? x.y : y);
+	}
+
+	set(x: number, y: number): TilePos;
+	set(pos: TilePos): TilePos;
+	set(x: number | TilePos, y: number = 0): TilePos {
+		if (x instanceof TilePos) {
+			this.x = x.x;
+			this.y = x.y;
+		} else {
+			this.x = x;
+			this.y = y;
+		}
+		return this;
+	}
+
 	isValid(): boolean {
 		return this.x >= 0
 			&& this.y >= 0
-			&& this.x < Game.TILE_WIDTH
-			&& this.y < Game.TILE_HEIGHT;
+			&& this.x < World.width
+			&& this.y < World.height;
 	}
 	plus(pos: TilePos): TilePos;
 	plus(x: number, y: number): TilePos;
@@ -143,8 +135,7 @@ export class TilePos extends Pos {
 		return new TilePos(this).move(dir);
 	}
 	toGamePos(): GamePos {
-		const pos = this.scale(Game.cellSize);
-		return new GamePos(pos.x, pos.y);
+		return new GamePos(this.x * World.tileSize, this.y * World.tileSize);
 	}
 	/**
 	 * returns the Manhattan distance between this and other
@@ -158,15 +149,36 @@ export class TilePos extends Pos {
 	}
 }
 
+
 /**
  * a Class to represent Pixel Coordinates on the Game field
  */
 export class GamePos extends Pos {
+
+	constructor(x: number, y: number);
+	constructor(pos: GamePos);
+	constructor(x: number | GamePos, y: number = 0) {
+		super(x instanceof Pos ? x.x : x, x instanceof Pos ? x.y : y);
+	}
+
+	set(x: number, y: number): GamePos;
+	set(pos: GamePos): GamePos;
+	set(x: number | GamePos, y: number = 0): GamePos {
+		if (x instanceof GamePos) {
+			this.x = x.x;
+			this.y = x.y;
+		} else {
+			this.x = x;
+			this.y = y;
+		}
+		return this;
+	}
+
 	isValid(): boolean {
 		return this.x >= 0
 			&& this.y >= 0
-			&& this.x < Game.GAME_WIDTH
-			&& this.y < Game.GAME_HEIGHT;
+			&& this.x < Game.width
+			&& this.y < Game.height;
 	}
 	plus(pos: GamePos): GamePos;
 	plus(x: number, y: number): GamePos;
@@ -200,7 +212,7 @@ export class GamePos extends Pos {
 		return new GamePos(Math.floor(this.x), Math.floor(this.y));
 	}
 	toTilePos(): TilePos {
-		const pos = this.scale(1 / Game.cellSize).floor();
+		const pos = this.scale(1 / World.tileSize).floor();
 		return new TilePos(pos.x, pos.y);
 	}
 	toGamePos(): GamePos {

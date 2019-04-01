@@ -1,5 +1,4 @@
 
-import { Game } from "../game";
 import { Menu, Selectable } from "../menu";
 
 export class Menus {

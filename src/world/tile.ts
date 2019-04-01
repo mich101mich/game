@@ -1,10 +1,12 @@
+import { Game } from "../game";
+import { TilePos } from "../geometry/pos";
+import { Rect } from "../geometry/rect";
+import { Job } from "../job";
+import { Option, Selectable } from "../menu";
+import { Wasm } from "../wasm";
+import { ItemType } from "./item";
+import { BUILD_COSTS, Machine, MachineType } from "./machine";
 
-import { Game } from "./game";
-import { Rect, TilePos } from "./geometry/mod";
-import { Item, ItemType } from "./item";
-import { PickupItemJob, RemoveTileJob, RemoveDebrisJob } from "./jobs/mod";
-import { MACHINE_DATA, Machine, MachineType } from "./machine";
-import { Option, Selectable } from "./menu";
 
 export enum TileType {
 	Air,
@@ -19,6 +21,7 @@ export enum TileType {
 }
 
 export class Tile implements Selectable {
+	static wasm: Wasm;
 	pos: TilePos;
 	rect: Rect;
 	private constructor(pos: TilePos) {
@@ -28,7 +31,7 @@ export class Tile implements Selectable {
 			this.pos.plus(1, 1).toGamePos());
 	}
 	get type(): TileType {
-		return Game.wasm.get(this.pos.x, this.pos.y);
+		return Tile.wasm.get(this.pos.x, this.pos.y);
 	}
 	getData() {
 		return TILE_DATA[this.type];
@@ -37,13 +40,13 @@ export class Tile implements Selectable {
 		return this.getData().strength;
 	}
 	isSolid(): boolean {
-		return Game.wasm.is_solid(this.pos.x, this.pos.y);
+		return Tile.wasm.is_solid(this.pos.x, this.pos.y);
 	}
 	getWalkCost(): number {
-		return Game.wasm.walk_cost(this.pos.x, this.pos.y);
+		return Tile.wasm.walk_cost(this.pos.x, this.pos.y);
 	}
 	isVisible(): boolean {
-		return Game.wasm.is_visible(this.pos.x, this.pos.y);
+		return Tile.wasm.is_visible(this.pos.x, this.pos.y);
 	}
 	isSelectable(): boolean {
 		return this.getData().selectable;
@@ -51,21 +54,6 @@ export class Tile implements Selectable {
 	isDrillable(): boolean {
 		const drillLevel = this.getData().drillLevel;
 		return drillLevel !== undefined && drillLevel <= Game.drillLevel;
-	}
-	remove() {
-		const drops = this.getData().drops || [];
-		for (const drop of drops) {
-			if (Math.random() < drop.probability) {
-				const pos = this.pos.mid().plus(Math.random() * 12 - 6, Math.random() * 12 - 6);
-				Game.items.create(pos, drop.item);
-			}
-		}
-		if (this.getData().leavesDebris) {
-			Game.place(this.pos, TileType.Debris);
-			Game.jobs.add(new RemoveDebrisJob(this));
-		} else {
-			Game.place(this.pos, TileType.Air);
-		}
 	}
 	getOutline(): Rect {
 		return this.rect;
@@ -84,18 +72,28 @@ export class Tile implements Selectable {
 				name: "Mark for Drill",
 				callback: () => {
 					for (const tile of tiles) {
-						if (tile.type == TileType.Debris) {
-							Game.jobs.add(new RemoveDebrisJob(tile, 0));
-						} else {
-							Game.jobs.add(new RemoveTileJob(tile));
-						}
+						const job = new Job(
+							{
+								pos: tile.pos,
+								range: 1,
+								duration: tile.getData().strength,
+								requirements: {
+									emptyHand: true,
+									tile: {
+										pos: tile.pos,
+										type: tile.type,
+									}
+								},
+							},
+							() => Game.place(tile.pos, TileType.Debris)
+						);
+						Game.scheduler.addJob(job);
 					}
 					return true;
 				},
-				hotkeys: ["d"],
 			});
 		} else if (this.type == TileType.Air) {
-			MACHINE_DATA
+			BUILD_COSTS
 				.map((data, type) => ({ data, type: type as MachineType }))
 				.filter(d => d.data.buildable)
 				.map(data => ({
@@ -106,7 +104,6 @@ export class Tile implements Selectable {
 						}
 						return true;
 					},
-					hotkeys: [],
 				}))
 				.forEach(o => options.push(o))
 		}

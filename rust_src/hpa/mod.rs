@@ -1,8 +1,17 @@
 mod hpa_map;
-pub use self::hpa_map::HPAMap;
+pub use self::hpa_map::{HPAMap, LAYER_COUNT};
 
-mod inter_link;
-pub use self::inter_link::{InterLink, LinkId};
+mod link;
+pub use self::link::{Link, LinkId};
+
+mod layer;
+pub use self::layer::Layer;
 
 mod chunk;
-pub use self::chunk::{Chunk, CHUNK_SIZE};
+pub use self::chunk::*;
+
+mod base_chunk;
+pub use self::base_chunk::{BaseChunk, CHUNK_SIZE};
+
+mod super_chunk;
+pub use self::super_chunk::SuperChunk;

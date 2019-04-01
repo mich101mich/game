@@ -1,12 +1,13 @@
 
-import { Cost } from "./cost";
-import { Game } from "./game";
-import { Rect, TilePos, Dir } from "./geometry/mod";
+import { Cost } from "../cost";
+import { Game } from "../game";
+import { Dir, TilePos } from "../geometry/pos";
+import { Rect } from "../geometry/rect";
+import { Option, Selectable } from "../menu";
+import { Scheduler } from "../scheduler";
 import { ItemType } from "./item";
-import { Option, Selectable } from "./menu";
 import { Tile, TileType } from "./tile";
-import { Worker } from "./worker";
-import { ResourceListener } from "./managers/mod";
+import { Symbol, World } from "./world";
 
 export enum MachineType {
 	Spawn,
@@ -15,8 +16,8 @@ export enum MachineType {
 	Platform,
 }
 
-export const MACHINE_DATA: {
-	cost: Cost,
+export const BUILD_COSTS: {
+	cost?: Cost,
 	buildable: boolean
 }[] = [
 		{ // Spawn
@@ -28,7 +29,6 @@ export const MACHINE_DATA: {
 			buildable: true,
 		},
 		{ // ConstructionSite
-			cost: new Cost({}),
 			buildable: false,
 		},
 		{ // Platform
@@ -37,13 +37,14 @@ export const MACHINE_DATA: {
 		}
 	];
 
-type MachineOptions = {
+export interface MachineOptions {
 	cost?: Cost,
 	result?: MachineType,
 	workDone?: () => void,
 }
 
-export class Machine implements Selectable, ResourceListener {
+export class Machine implements Selectable {
+	parent: Scheduler;
 	pos: TilePos;
 	rect: Rect;
 	type: MachineType;
@@ -53,30 +54,28 @@ export class Machine implements Selectable, ResourceListener {
 	options: MachineOptions;
 	levelupCost: Cost = new Cost({ ore: 5 });
 
-	constructor(pos: TilePos, type: MachineType, options: MachineOptions = {}) {
+	constructor(parent: Scheduler, pos: TilePos, type: MachineType, options: MachineOptions = {}) {
+		this.parent = parent;
 		this.pos = new TilePos(pos);
 		this.type = type;
 		this.options = options;
 		this.rect = new Rect(
-			this.pos.x * Game.cellSize,
-			this.pos.y * Game.cellSize,
-			Game.cellSize,
-			Game.cellSize);
+			this.pos.x * World.tileSize,
+			this.pos.y * World.tileSize,
+			World.tileSize,
+			World.tileSize
+		);
 
-		if (type == MachineType.Spawn) {
-			const cost = new Cost({ ore: Infinity, crystal: Infinity });
-			Game.items.request(this, cost, 100);
-		} else if (type == MachineType.ConstructionSite) {
+		if (type == MachineType.ConstructionSite) {
 			if (options.cost) {
-				options.cost.request(this);
+				this.parent.request(options.cost);
 			}
 		}
 
 		if (type == MachineType.Spawn) {
-			if (Game.resources.get(ItemType.Crystal) > 0) {
+			if (parent.countResource(ItemType.Crystal) > 0) {
 				this.setPower(true);
 			}
-			Game.resources.addListener(this);
 		} else {
 			if (this.neighborMachines().find(m => m.power)) {
 				this.setPower(true);
@@ -114,13 +113,13 @@ export class Machine implements Selectable, ResourceListener {
 	private neighborMachines(): Machine[] {
 		return [Dir.UP, Dir.RIGHT, Dir.DOWN, Dir.LEFT]
 			.map(dir => new TilePos(this.pos).move(dir))
-			.map(pos => Game.machines.at(pos))
+			.map(pos => this.parent.machines.at(pos))
 			.filter(m => m);
 	}
 
 	requestedItemDelivered(type: ItemType) {
 		if (this.type == MachineType.Spawn) {
-			Game.resources.add(type);
+			this.parent.resources.add(type);
 		}
 	}
 	requestComplete() {
@@ -130,14 +129,19 @@ export class Machine implements Selectable, ResourceListener {
 			this.options.workDone = () => {
 				const result = this.options.result || MachineType.Spawn;
 				delete this.options.result;
-				this.remove();
-				Game.machines.add(new Machine(this.pos, result, this.options));
+				if (result == MachineType.Platform) {
+					Game.place(this.pos, TileType.Platform);
+				}
+				this.type = result;
+				if (this.conducts() && this.givesPower()) {
+					this.setPower(true);
+				}
 			}
 		}
 	}
 
 	givesPower(): boolean {
-		if (this.type == MachineType.Spawn && Game.resources.get(ItemType.Crystal) > 0) {
+		if (this.type == MachineType.Spawn && this.parent.countResource(ItemType.Crystal) > 0) {
 			return true;
 		}
 		return false;
@@ -148,7 +152,7 @@ export class Machine implements Selectable, ResourceListener {
 	}
 
 	setPower(power: boolean) {
-		if (this.power == power) {
+		if (!this.conducts() || this.power == power) {
 			return;
 		}
 		if (this.givesPower() && !power) {
@@ -190,26 +194,12 @@ export class Machine implements Selectable, ResourceListener {
 		return this.cooldown == 0 && this.power;
 	}
 
-	remove() {
-		Game.resources.removeListener(this);
-		Tile.at(this.pos).remove();
-		Game.machines.remove(this);
-		Game.menu.remove(this);
-
-		if (this.power) {
-			for (const machine of this.neighborMachines()) {
-				if (machine.conducts()) {
-					machine.setPower(false);
-				}
-			}
-		}
-	}
-
 	draw(context: CanvasRenderingContext2D) {
-		context.drawImage(Game.assets, this.type * 16, 16, 16, 16, this.rect.x, this.rect.y, this.rect.width, this.rect.height);
+		World.drawMachine(context, this.type, this.rect);
 		if (!this.power && this.conducts()) {
 			context.fillStyle = "rgba(0,0,0,0.3)";
 			context.fillRect(this.rect.x, this.rect.y, this.rect.width, this.rect.height);
+			World.drawSymbol(context, Symbol.LowPower, this.rect);
 		}
 	}
 
@@ -237,8 +227,11 @@ export class Machine implements Selectable, ResourceListener {
 		const options: Option[] = [
 			{
 				name: "Destroy",
-				callback: () => { this.remove(); return true; },
-				hotkeys: ["backspace", "delete"]
+				callback: () => {
+					this.parent.removeMachine(this);
+					Game.place(this.pos, TileType.Debris);
+					return true;
+				},
 			}
 		];
 
@@ -246,14 +239,13 @@ export class Machine implements Selectable, ResourceListener {
 			options.unshift({
 				name: "Level up " + this.levelupCost.display(),
 				callback: () => {
-					this.levelupCost.pay();
+					this.parent.pay(this.levelupCost);
 					this.options.workDone = () => this.level++;
 					this.cooldown = (this.level + 2) * 4;
 					this.levelupCost.amount.set(ItemType.Ore, (this.level + 2) * 5);
 					return false;
 				},
-				enabled: () => this.ready() && this.levelupCost.isAvailable(),
-				hotkeys: ["u", "+"]
+				enabled: () => this.ready() && this.parent.isAvailable(this.levelupCost)
 			});
 		}
 
@@ -264,7 +256,7 @@ export class Machine implements Selectable, ResourceListener {
 					this.options.workDone = () => {
 						const pos = this.freeNeighbor();
 						if (pos) {
-							Game.workers.add(new Worker(pos));
+							throw new Error("Not implemented!");
 						} else {
 							alert("Unable to spawn Worker: No free space near Spawn!");
 						}
@@ -272,8 +264,7 @@ export class Machine implements Selectable, ResourceListener {
 					this.cooldown = Math.max(5, 20 - this.level * 2);
 					return false;
 				},
-				enabled: () => this.ready() && Game.workers.hasRoom() && this.freeNeighbor() != null,
-				hotkeys: ["s"]
+				enabled: () => this.ready() && Game.scheduler.workers.hasRoom() && this.freeNeighbor() != null
 			});
 		} else if (this.type == MachineType.Lab) {
 			RESEARCH
@@ -281,7 +272,7 @@ export class Machine implements Selectable, ResourceListener {
 				.map(r => ({
 					name: r.name + "\n" + r.cost.display(),
 					callback: () => {
-						r.cost.pay();
+						this.parent.pay(r.cost);
 						this.cooldown = Math.max(5, r.time - this.level * 5);
 						this.options.workDone = r.onResearched;
 						if (r.costIncrease) {
@@ -289,7 +280,7 @@ export class Machine implements Selectable, ResourceListener {
 						}
 						return false;
 					},
-					enabled: () => this.ready() && r.cost.isAvailable() && r.available(),
+					enabled: () => this.ready() && this.parent.isAvailable(r.cost) && r.available(),
 					hotkeys: []
 				}))
 				.forEach(o => options.push(o))
@@ -302,10 +293,10 @@ export class Machine implements Selectable, ResourceListener {
 		if (!Game.isFree(pos)) {
 			return;
 		}
-		Game.machines.add(new Machine(pos, MachineType.ConstructionSite, {
-			cost: new Cost(MACHINE_DATA[type].cost),
+		Game.scheduler.addMachine(pos, MachineType.ConstructionSite, {
+			cost: new Cost(BUILD_COSTS[type].cost || {}),
 			result: type,
-		}));
+		});
 	}
 
 	static debugMode() {
@@ -362,7 +353,7 @@ const RESEARCH: {
 			cost: new Cost({ crystal: 10 }),
 			time: 50,
 			onResearched: () => {
-				Game.workers.capacity += 10;
+				Game.scheduler.workers.capacity += 10;
 			},
 			available: () => true,
 			costIncrease: (current: Cost) => {

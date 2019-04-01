@@ -10,6 +10,11 @@ impl<P> Path<P> {
 	pub fn new(path: Vec<P>, cost: Cost) -> Path<P> {
 		Path { path, cost }
 	}
+	pub fn append(&mut self, node: P, cost: Cost) -> &mut Self {
+		self.path.push(node);
+		self.cost += cost;
+		self
+	}
 }
 
 use std::ops::*;

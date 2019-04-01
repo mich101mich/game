@@ -1,13 +1,11 @@
 
-import { Game } from "./game";
-import { Rect } from "./geometry/mod";
-import { MouseMode } from "./mouseHandler";
+import { Rect } from "./geometry/rect";
+import { MouseHandler, MouseMode } from "./mouseHandler";
 
 export type Option = {
 	name: string,
 	callback: () => boolean,
 	enabled?: () => boolean,
-	hotkeys: string[],
 };
 
 export interface Selectable {
@@ -18,19 +16,21 @@ export interface Selectable {
 }
 
 export class Menu {
+	mouseHandler: MouseHandler;
 	container: HTMLTableElement;
 	selection = new Set<Selectable>();
 	options: Option[] = [];
 	buttons: HTMLButtonElement[] = [];
 	hasDefaultOptions: boolean;
 
-	constructor(container: HTMLTableElement, hasDefaultOptions: boolean = true) {
+	constructor(mouseHandler: MouseHandler, container: HTMLTableElement, hasDefaultOptions: boolean = true) {
+		this.mouseHandler = mouseHandler;
 		this.container = container;
 		this.hasDefaultOptions = hasDefaultOptions;
 
 		document.addEventListener("keydown", event => {
 
-			Game.mouseHandler.updateKeys(event);
+			this.mouseHandler.updateKeys(event);
 
 			const key = toKeyCode(event);
 
@@ -42,13 +42,6 @@ export class Menu {
 				if (num < this.options.length) {
 					this.call(this.options[num]);
 					event.preventDefault();
-				}
-			} else {
-				for (const option of this.options) {
-					if (option.hotkeys.indexOf(key) != -1) {
-						this.call(option);
-						event.preventDefault();
-					}
 				}
 			}
 		});
@@ -69,7 +62,7 @@ export class Menu {
 	refresh() {
 		if (this.selection.size == 0) {
 			if (this.hasDefaultOptions) {
-				this.options = getDefaultOptions();
+				this.options = this.getDefaultOptions();
 			} else {
 				this.options = [];
 			}
@@ -104,9 +97,6 @@ export class Menu {
 			const option = this.options[i];
 
 			let button = elements[i] as HTMLButtonElement;
-
-			button.setAttribute("tooltip", [(i + 1).toString()].concat(option.hotkeys).join(", "));
-			button.setAttribute("tooltip-position", "left");
 			button.innerText = option.name;
 		}
 	}
@@ -154,6 +144,29 @@ export class Menu {
 			return description + info;
 		}
 	}
+	getDefaultOptions(): Option[] {
+		let options: Option[] = [];
+
+		if (this.mouseHandler.mouseMode != MouseMode.PlacePlatform) {
+			options.push({
+				name: "Place Platforms",
+				callback: () => {
+					this.mouseHandler.mouseMode = MouseMode.PlacePlatform;
+					return true;
+				}
+			});
+		} else {
+			options.push({
+				name: "Stop placing Platforms",
+				callback: () => {
+					this.mouseHandler.mouseMode = MouseMode.Default;
+					return true;
+				}
+			});
+		}
+
+		return options;
+	}
 }
 
 function toKeyCode(event: KeyboardEvent): string {
@@ -173,28 +186,3 @@ function toKeyCode(event: KeyboardEvent): string {
 	return key;
 }
 
-function getDefaultOptions(): Option[] {
-	let options: Option[] = [];
-
-	if (Game.mouseHandler.mouseMode != MouseMode.PlacePlatform) {
-		options.push({
-			name: "Place Platforms",
-			callback: () => {
-				Game.mouseHandler.mouseMode = MouseMode.PlacePlatform;
-				return true;
-			},
-			hotkeys: ["p"]
-		});
-	} else {
-		options.push({
-			name: "Stop placing Platforms",
-			callback: () => {
-				Game.mouseHandler.mouseMode = MouseMode.Default;
-				return true;
-			},
-			hotkeys: ["p"]
-		});
-	}
-
-	return options;
-}

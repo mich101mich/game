@@ -1,10 +1,8 @@
 
-import { Game } from "./game";
-import { GamePos, Rect } from "./geometry/mod";
-import { Machine } from "./machine";
-import { Option, Selectable } from "./menu";
+import { GamePos } from "../geometry/pos";
+import { Rect } from "../geometry/rect";
+import { Option, Selectable } from "../menu";
 import { Worker } from "./worker";
-import { Request } from "./managers/mod";
 
 export enum ItemType {
 	Ore,
@@ -15,28 +13,17 @@ export class Item implements Selectable {
 	pos: GamePos;
 	type: ItemType;
 	worker: Worker | null = null;
-	request: Request | null;
-	constructor(pos: GamePos, type: ItemType, request: Request | null = null) {
+	request: Request;
+	constructor(pos: GamePos, type: ItemType, request: Request) {
 		this.type = type;
 		this.pos = pos;
 		this.request = request;
 	}
 
-	exists(): boolean {
-		return Game.items.contains(this);
-	}
-
-	remove() {
+	animationUpdate(subTickProgress: number) {
 		if (this.worker) {
-			this.worker.item = null;
-			this.worker = null;
+			this.pos.set(this.worker.absolutePosition)
 		}
-		if (this.request) {
-			this.request.removeItem(this);
-			this.request = null;
-		}
-		Game.items.remove(this);
-		Game.menu.remove(this);
 	}
 
 	draw(context: CanvasRenderingContext2D) {

@@ -1,56 +1,47 @@
 
-import { GamePos, TilePos, Dir } from "./geometry/mod";
-import { Machine, MachineType } from "./machine";
-import { Items, Jobs, Machines, Menus, Resources, Workers } from "./managers/mod";
+import { GamePos, TilePos } from "./geometry/pos";
+import { Menus } from "./managers/menus";
 import { Menu, Selectable } from "./menu";
 import { MouseHandler } from "./mouseHandler";
-import { Tile, TileType } from "./tile";
+import { Scheduler } from "./scheduler";
 import { Wasm } from "./wasm";
-import { Worker } from "./worker";
-import { ItemType } from "./item";
-
-const CELL_SIZE = 16;
+import { ItemType } from "./world/item";
+import { Machine, MachineType } from "./world/machine";
+import { Tile, TileType } from "./world/tile";
+import { World } from "./world/world";
 
 export class Game {
-	static wasm: Wasm;
 	static mouseHandler: MouseHandler;
 
-	static background: HTMLCanvasElement;
 	static canvas: HTMLCanvasElement;
-	static assets: ImageBitmap;
 
-	static resources = new Resources();
-	static machines = new Machines();
-	static workers = new Workers();
-	static items = new Items();
-	static jobs = new Jobs();
 	static menu = new Menus();
+	static scheduler = new Scheduler();
 
 	static drillLevel = 0;
 	static drillSpeed = 1;
 
-	static backgroundDirty = false;
-
 	static time = 0;
 	static timeDebt = 0;
 	static gameSpeed = 200;
-	static subTickProgress = 0;
 
 	static debugModeActive = false;
 	static debugDisplayActive = false;
 
-	static TILE_WIDTH = 128;
-	static TILE_HEIGHT = 128;
-	static GAME_WIDTH = Game.TILE_WIDTH * CELL_SIZE;
-	static GAME_HEIGHT = Game.TILE_HEIGHT * CELL_SIZE;
-	static SCREEN_WIDTH = 40 * CELL_SIZE;
-	static SCREEN_HEIGHT = 40 * CELL_SIZE;
-
-	static get cellSize() {
-		return CELL_SIZE;
+	static get width() {
+		return World.width * World.tileSize;
+	}
+	static get height() {
+		return World.height * World.tileSize;
 	}
 
+	static SCREEN_WIDTH = 40 * World.width;
+	static SCREEN_HEIGHT = 40 * World.height;
+
 	static init(wasm: Wasm, assets: ImageBitmap) {
+
+		Tile.wasm = wasm;
+		World.init(wasm, assets);
 
 		Game.canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
@@ -66,24 +57,15 @@ export class Game {
 		window.addEventListener("resize", resize);
 		resize();
 
-		Game.assets = assets;
-		Game.wasm = wasm;
-		Game.wasm.init(Game.TILE_WIDTH, Game.TILE_HEIGHT);
-
-		Game.background = document.createElement("canvas");
-
-		Game.background.width = Game.GAME_WIDTH;
-		Game.background.height = Game.GAME_HEIGHT;
-
 		Game.menu.info = document.getElementById("info") as HTMLDivElement;
 
 		Game.mouseHandler = new MouseHandler(Game.canvas, (selection) => Game.menu.onNewSelection(selection));
 
 		const list = document.getElementById("options") as HTMLTableElement;
-		Game.menu.side = new Menu(list);
+		Game.menu.side = new Menu(Game.mouseHandler, list);
 
 		const contextList = document.getElementById("contextMenu") as HTMLTableElement;
-		Game.menu.context = new Menu(contextList, false);
+		Game.menu.context = new Menu(Game.mouseHandler, contextList, false);
 
 		Game.canvas.addEventListener("click", event => {
 			Game.menu.context.selection.clear();
@@ -110,67 +92,97 @@ export class Game {
 			Game.menu.refresh();
 		})
 
-		const midX = Game.TILE_WIDTH / 2;
-		const midY = Game.TILE_HEIGHT / 2;
+		const midX = World.width / 2;
+		const midY = World.height / 2;
 
-		Game.machines.add(new Machine(new TilePos(midX, midY), MachineType.Spawn));
+		Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX, midY), MachineType.Spawn));
 		for (let i = 1; i < 3; i++) {
-			Game.machines.add(new Machine(new TilePos(midX, midY + i), MachineType.Platform));
+			Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX, midY + i), MachineType.Platform));
 		}
 		for (let i = 1; i < 5; i++) {
-			Game.machines.add(new Machine(new TilePos(midX, midY - i), MachineType.Platform));
+			Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX, midY - i), MachineType.Platform));
 		}
-		Game.machines.add(new Machine(new TilePos(midX - 1, midY - 4), MachineType.Platform));
+		Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX - 1, midY - 4), MachineType.Platform));
 		for (let i = 1; i < 4; i++) {
 			Machine.constructMachine(new TilePos(midX - i, midY), MachineType.Platform);
 		}
 		for (let i = 1; i < 3; i++) {
-			Game.machines.add(new Machine(new TilePos(midX + i, midY), MachineType.Platform));
+			Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX + i, midY), MachineType.Platform));
 		}
 		for (let i = 0; i < 2; i++) {
-			Game.machines.add(new Machine(new TilePos(midX + 3, midY + i), MachineType.Platform));
+			Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX + 3, midY + i), MachineType.Platform));
 		}
-		Game.machines.add(new Machine(new TilePos(midX + 3, midY + 2), MachineType.Lab));
+		Game.scheduler.machines.add(new Machine(Game.scheduler, new TilePos(midX + 3, midY + 2), MachineType.Lab));
 
-		Game.workers.add(new Worker(new TilePos(midX - 1, midY - 1)));
-		Game.workers.add(new Worker(new TilePos(midX - 1, midY + 1)));
-		Game.workers.add(new Worker(new TilePos(midX, midY - 1)));
-		Game.workers.add(new Worker(new TilePos(midX, midY + 1)));
-		Game.workers.add(new Worker(new TilePos(midX + 1, midY - 1)));
-		Game.workers.add(new Worker(new TilePos(midX + 1, midY)));
-		Game.workers.add(new Worker(new TilePos(midX + 1, midY + 1)));
+		Game.scheduler.addWorker(new TilePos(midX - 1, midY - 1));
+		Game.scheduler.addWorker(new TilePos(midX - 1, midY + 1));
+		Game.scheduler.addWorker(new TilePos(midX, midY - 1));
+		Game.scheduler.addWorker(new TilePos(midX, midY + 1));
+		Game.scheduler.addWorker(new TilePos(midX + 1, midY - 1));
+		Game.scheduler.addWorker(new TilePos(midX + 1, midY));
+		Game.scheduler.addWorker(new TilePos(midX + 1, midY + 1));
 
-		Game.resources.display = document.getElementById("resources") as HTMLDivElement;
+		Game.scheduler.resources.display = document.getElementById("resources") as HTMLDivElement;
 
-		Game.refreshBackground();
+		const params = new URL(window.location.toString()).searchParams;
+		function parseParamInt(name: string, standard = 0): number {
+			if (!params.has(name) || !params.get(name)!.match(/^\d+$/)) {
+				return standard;
+			}
+			return parseInt(params.get(name)!);
+		}
+		function parseParamBool(name: string, standard = false): boolean {
+			if (!params.has(name)) {
+				return standard;
+			}
+			return params.get(name) != "false" && params.get(name) != "0";
+		}
+		if (parseParamBool("debug") || parseParamBool("debugMode")) {
+			Game.debugMode();
+		}
 
-		requestAnimationFrame(Game.update.bind(Game));
+		if (parseParamBool("debugDisplay")) {
+			Game.debugDisplay();
+
+			if (parseParamInt("hpaLevel", 0) == -1) {
+				World.debugParams.hpaLevel = -1;
+			}
+			if (!parseParamBool("edges", true)) {
+				World.debugParams.edges = false;
+			}
+			if (!parseParamBool("ignoreVisibility", true)) {
+				World.debugParams.ignoreVisibility = false;
+			}
+		} else {
+			World.debugParams.hpaLevel = parseParamInt("hpaLevel", -1);
+			World.debugParams.edges = parseParamBool("edges");
+			World.debugParams.ignoreVisibility = parseParamBool("ignoreVisibility");
+		}
+
+		requestAnimationFrame(Game.update);
 	}
 
 	static update(currentTime: number) {
-		requestAnimationFrame(Game.update.bind(Game));
+		requestAnimationFrame(Game.update);
 		const deltaTime = currentTime - Game.time;
 		Game.time = currentTime;
 		Game.timeDebt += deltaTime;
 
 		if (Game.timeDebt >= Game.gameSpeed) {
 			Game.timeDebt = 0;
-			Game.subTickProgress = 0;
-			for (const worker of Game.workers) {
-				worker.tick();
-			}
-			for (const machine of Game.machines) {
-				machine.tick();
-			}
-		} else {
-			Game.subTickProgress = Game.timeDebt / Game.gameSpeed;
+			Game.tick();
 		}
-
-		if (Game.backgroundDirty) {
-			Game.refreshBackground();
-		}
+		Game.animationUpdate(Game.timeDebt / Game.gameSpeed);
 
 		Game.draw();
+	}
+
+	static tick() {
+		Game.scheduler.tick();
+	}
+
+	static animationUpdate(subTickProgress: number) {
+		Game.scheduler.animationUpdate(subTickProgress);
 	}
 
 	static draw() {
@@ -188,15 +200,15 @@ export class Game {
 
 		context.setTransform(Game.mouseHandler.zoom, 0, 0, Game.mouseHandler.zoom, Game.mouseHandler.offset.x, Game.mouseHandler.offset.y);
 
-		context.drawImage(Game.background, 0, 0);
+		World.draw(context, Game.debugDisplayActive);
 
-		for (const machine of Game.machines) {
+		for (const machine of Game.scheduler.machines) {
 			machine.draw(context);
 		}
-		for (const worker of Game.workers) {
-			worker.draw(context);
+		for (const worker of Game.scheduler.workers) {
+			worker.draw(context, World.tileSize);
 		}
-		for (const item of Game.items) {
+		for (const item of Game.scheduler.items) {
 			item.draw(context);
 		}
 
@@ -216,9 +228,9 @@ export class Game {
 		}
 		Game.menu.info.innerText = text;
 
-		Game.resources.draw();
+		Game.scheduler.resources.draw();
 
-		Game.mouseHandler.draw(context, CELL_SIZE);
+		Game.mouseHandler.draw(context, World.tileSize);
 
 		if (Game.debugDisplayActive) {
 			const pos = Game.mouseHandler.mouse.toTilePos();
@@ -226,106 +238,22 @@ export class Game {
 
 			const fontArgs = context.font.split(" ");
 			const font = fontArgs[fontArgs.length - 1];
-			context.font = CELL_SIZE + "px " + font;
+			context.font = World.tileSize + "px " + font;
 
 			const textWidth = context.measureText(Math.max(pos.x, pos.y).toString()).width;
 
 			context.fillStyle = "black";
-			context.fillRect(0, 0, textWidth + 8, CELL_SIZE * 2 + 8);
+			context.fillRect(0, 0, textWidth + 8, World.tileSize * 2 + 8);
 			context.fillStyle = "white";
-			context.fillRect(2, 2, textWidth + 4, CELL_SIZE * 2 + 4);
+			context.fillRect(2, 2, textWidth + 4, World.tileSize * 2 + 4);
 			context.strokeStyle = "black";
-			context.strokeText(pos.x.toString(), 4, CELL_SIZE + 2);
-			context.strokeText(pos.y.toString(), 4, CELL_SIZE * 2 + 2);
-		}
-	}
-
-	static refreshBackground() {
-
-		Game.backgroundDirty = false;
-
-		const context = Game.background.getContext("2d");
-		if (!context) {
-			throw new Error("Canvas 2d-Mode not supported");
-		}
-
-		context.fillStyle = "black";
-		context.fillRect(0, 0, Game.GAME_WIDTH, Game.GAME_HEIGHT);
-		context.fillStyle = "white";
-		const pos = new TilePos(0, 0);
-		for (pos.y = 0; pos.y < Game.TILE_HEIGHT; pos.y++) {
-			for (pos.x = 0; pos.x < Game.TILE_WIDTH; pos.x++) {
-				if (Game.wasm.is_visible(pos.x, pos.y)) {
-					context.fillRect(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-					const n = Game.wasm.get(pos.x, pos.y) as number;
-					if (Game.wasm.get(pos.x, pos.y) == TileType.Platform) {
-						const variant = [0, 1, 2, 3].map(dir => {
-							const other = pos.getInDir(dir as Dir);
-							if (!other.isValid()) {
-								return false;
-							}
-							const type = Game.wasm.get(other.x, other.y);
-							return type == TileType.Platform || type == TileType.Machine;
-						})
-							.map(hasNeighbor => hasNeighbor ? 1 : 0)
-							.reduceRight((prev, curr) => (prev << 1) | curr, 0);
-						context.drawImage(Game.assets, variant * 16, 32, 16, 16, pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-					} else {
-						context.drawImage(Game.assets, n * 16, 0, 16, 16, pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-					}
-				}
-			}
-		}
-		if (Game.debugDisplayActive) {
-			context.strokeStyle = "red";
-			context.beginPath();
-			const chunkSize = Game.wasm.chunk_size();
-			for (let y = 0; y < Game.TILE_HEIGHT; y += chunkSize) {
-				context.moveTo(0, y * CELL_SIZE);
-				context.lineTo(Game.GAME_WIDTH, y * CELL_SIZE);
-			}
-			for (let x = 0; x < Game.TILE_WIDTH; x += chunkSize) {
-				context.moveTo(x * CELL_SIZE, 0);
-				context.lineTo(x * CELL_SIZE, Game.GAME_HEIGHT);
-			}
-			context.stroke();
-			const colors = ["black"];
-			for (let i = 1; i < chunkSize * 4; i++) {
-				let percent = i / (chunkSize * 4);
-				colors.push("rgb(" + (percent * 255) + ", " + (255 - percent * 255) + ", 0)")
-			}
-			Game.wasm.iter_links();
-			do {
-				const x = Game.wasm.link_x();
-				const y = Game.wasm.link_y();
-				const id = Game.wasm.link_id();
-
-				const rect = Tile.at(x, y).getOutline();
-				context.strokeStyle = "red";
-				context.strokeRect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
-				do {
-					const cx = Game.wasm.connection_x();
-					const cy = Game.wasm.connection_y();
-					const cost = Game.wasm.connection_cost();
-					context.strokeStyle = colors[cost];
-					context.beginPath();
-					context.moveTo((x + 0.5) * CELL_SIZE, (y + 0.5) * CELL_SIZE);
-					const midX = ((x + 0.5) + (cx + 0.5)) / 2;
-					const midY = ((y + 0.5) + (cy + 0.5)) / 2;
-					context.lineTo(midX * CELL_SIZE, midY * CELL_SIZE);
-					context.stroke();
-				} while (Game.wasm.next_connection());
-
-				context.strokeStyle = "blue";
-				context.strokeText(id.toString(), rect.left, rect.bottom);
-			} while (Game.wasm.next_link());
+			context.strokeText(pos.x.toString(), 4, World.tileSize + 2);
+			context.strokeText(pos.y.toString(), 4, World.tileSize * 2 + 2);
 		}
 	}
 
 	static place(pos: TilePos, material: TileType) {
-		Game.wasm.set(pos.x, pos.y, material);
-		Game.wasm.set_visible(pos.x, pos.y);
-		Game.backgroundDirty = true;
+		World.place(pos, material);
 
 		const tile = Tile.at(pos);
 		Game.mouseHandler.selection.delete(tile);
@@ -354,17 +282,17 @@ export class Game {
 			return false;
 		}
 		const rect = tile.getOutline();
-		for (const worker of Game.workers) {
+		for (const worker of Game.scheduler.workers) {
 			if (worker.getOutline().intersects(rect)) {
 				return false;
 			}
 		}
-		for (const item of Game.items) {
+		for (const item of Game.scheduler.items) {
 			if (item.getOutline().intersects(rect)) {
 				return false;
 			}
 		}
-		for (const machine of Game.machines) {
+		for (const machine of Game.scheduler.machines) {
 			if (machine.getOutline().intersects(rect)) {
 				return false;
 			}
@@ -382,17 +310,17 @@ export class Game {
 			return null;
 		}
 
-		for (const worker of Game.workers) {
+		for (const worker of Game.scheduler.workers) {
 			if (worker.getOutline().contains(gamePos)) {
 				return worker;
 			}
 		}
-		for (const item of Game.items) {
+		for (const item of Game.scheduler.items) {
 			if (item.getOutline().contains(gamePos)) {
 				return item;
 			}
 		}
-		for (const machine of Game.machines) {
+		for (const machine of Game.scheduler.machines) {
 			if (machine.getOutline().contains(gamePos)) {
 				return machine;
 			}
@@ -410,16 +338,21 @@ export class Game {
 		Game.debugModeActive = true;
 		Game.gameSpeed = 0;
 		Game.mouseHandler.brushSize = 60;
-		for (const machine of Game.machines) {
+		for (const machine of Game.scheduler.machines) {
 			machine.level = 100;
 		}
 		Machine.debugMode();
-		Game.resources.add(ItemType.Ore, 1000000);
-		Game.resources.add(ItemType.Crystal, 1000000);
-		Game.backgroundDirty = true;
+		Game.scheduler.resources.add(ItemType.Ore, 1000000);
+		Game.scheduler.resources.add(ItemType.Crystal, 1000000);
+		World.needsDrawing = true;
 	}
 	static debugDisplay() {
 		Game.debugDisplayActive = !Game.debugDisplayActive;
-		Game.backgroundDirty = true;
+		World.needsDrawing = true;
+		if (Game.debugDisplayActive) {
+			World.debugParams.hpaLevel = 0;
+			World.debugParams.edges = true;
+			World.debugParams.ignoreVisibility = true;
+		}
 	}
 }

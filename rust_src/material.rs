@@ -22,7 +22,7 @@ impl Material {
 			&Air => 2,
 			&Platform => 1,
 			&Debris => 4,
-			_ => 255,
+			_ => panic!("Called walk_cost() on a solid tile"),
 		}
 	}
 }

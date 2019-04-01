@@ -45,11 +45,7 @@ where
 		for other_id in get_all_neighbors(current_id) {
 			let other_cost = current_cost + get_cost(current_id, other_id);
 
-			if !is_walkable(other_id) {
-				if other_id == goal {
-					visited.insert(other_id, (other_cost, current_id));
-					break 'search;
-				}
+			if !is_walkable(other_id) && other_id != goal {
 				continue;
 			}
 
@@ -111,45 +107,40 @@ where
 	let mut next = vec![(start, 0)];
 	visited.insert(start, (0, start));
 
-	let mut valid_goals = vec![];
-	let mut solid_goals = vec![];
-	for &goal_id in goals {
-		if is_walkable(goal_id) {
-			valid_goals.push(goal_id);
-		} else {
-			solid_goals.push(goal_id);
-		}
-	}
+	let mut remaining_goals = Vec::from(goals.clone());
 
 	let mut goal_costs = HashMap::with_capacity(goals.len());
 
 	while let Some((current_id, _)) = next.pop() {
 		let cost = visited[&current_id].0;
 
-		for &goal_id in valid_goals.iter() {
+		for &goal_id in remaining_goals.iter() {
 			if current_id == goal_id {
 				goal_costs.insert(goal_id, cost);
 			}
 		}
-		valid_goals.retain(|&id| id != current_id);
-		if valid_goals.is_empty() && solid_goals.is_empty() {
+		remaining_goals.retain(|&id| id != current_id);
+		if remaining_goals.is_empty() {
 			break;
+		}
+
+		if !is_walkable(current_id) {
+			continue;
 		}
 
 		for other_id in get_all_neighbors(current_id) {
 			let other_cost = cost + get_cost(current_id, other_id);
 
 			if !is_walkable(other_id) {
-				for &goal_id in solid_goals.iter() {
-					if other_id == goal_id
-						&& (!goal_costs.contains_key(&other_id)
-							|| goal_costs[&other_id] > other_cost)
-					{
-						visited.insert(other_id, (other_cost, current_id));
-						goal_costs.insert(other_id, other_cost);
+				let mut is_goal = false;
+				for &goal_id in remaining_goals.iter() {
+					if other_id == goal_id {
+						is_goal = true;
 					}
 				}
-				continue;
+				if !is_goal {
+					continue;
+				}
 			}
 
 			if let Some(&(prev_cost, _)) = visited.get(&other_id) {

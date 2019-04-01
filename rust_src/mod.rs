@@ -13,8 +13,8 @@ pub use self::point::Point;
 mod maze;
 pub use self::maze::*;
 
-mod hpa;
-pub use self::hpa::{HPAMap, CHUNK_SIZE};
+pub mod hpa;
+pub use self::hpa::*;
 
 mod utils;
 pub use self::utils::*;

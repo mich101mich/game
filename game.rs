@@ -60,7 +60,9 @@ pub fn set(x: usize, y: usize, value: Material) {
 	let materials = materials();
 	let old = materials[x][y];
 	materials[x][y] = value;
-	if old.is_solid() != value.is_solid() || old.walk_cost() != value.walk_cost() {
+	if old.is_solid() != value.is_solid()
+		|| (!old.is_solid() && old.walk_cost() != value.walk_cost())
+	{
 		hpa_map().tile_changed(Point::new(x, y), materials);
 	}
 }
@@ -296,68 +298,68 @@ pub fn gen_hpa_map() {
 	maze_data().gen_hpa_map();
 }
 #[no_mangle]
-pub fn chunk_size() -> usize {
-	CHUNK_SIZE
+pub fn chunk_size(layer: usize) -> usize {
+	get_chunk_size(layer)
 }
 
-static mut CURRENT_LINK_INDEX: usize = 0;
-static mut CURRENT_LINK_EDGE: usize = 0;
+static mut CURRENT_LINK_INDEX: i32 = -1;
+static mut CURRENT_LINK_EDGE: i32 = -1;
+
+unsafe fn current_link() -> &'static rust_src::hpa::Link {
+	let mut links = hpa_map().links.values();
+	links.nth(CURRENT_LINK_INDEX as usize).unwrap()
+}
+unsafe fn other_link() -> &'static rust_src::hpa::Link {
+	let other = current_link().paths.keys().nth(CURRENT_LINK_EDGE as usize).unwrap();
+	hpa_map().links.get(&other).unwrap()
+}
+unsafe fn other_link_cost() -> Cost {
+	let path = current_link().paths.values().nth(CURRENT_LINK_EDGE as usize).unwrap();
+	path.cost
+}
 
 #[no_mangle]
 pub unsafe fn iter_links() {
-	CURRENT_LINK_INDEX = 0;
+	CURRENT_LINK_INDEX = -1;
+	CURRENT_LINK_EDGE = -1;
 }
 #[no_mangle]
 pub unsafe fn link_x() -> usize {
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	link.pos.x
+	current_link().pos.x
 }
 #[no_mangle]
 pub unsafe fn link_y() -> usize {
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	link.pos.y
+	current_link().pos.y
 }
 #[no_mangle]
 pub unsafe fn link_id() -> usize {
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	link.id
+	current_link().id
 }
 #[no_mangle]
 pub unsafe fn next_link() -> bool {
 	CURRENT_LINK_INDEX += 1;
-	CURRENT_LINK_EDGE = 0;
-	CURRENT_LINK_INDEX < hpa_map().links.len()
+	CURRENT_LINK_EDGE = -1;
+
+	CURRENT_LINK_INDEX < hpa_map().links.len() as i32
 }
 
 #[no_mangle]
 pub unsafe fn connection_x() -> usize {
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	let other = link.edges.keys().nth(CURRENT_LINK_EDGE).unwrap();
-	hpa_map().links[&other].pos.x
+	other_link().pos.x
 }
 #[no_mangle]
 pub unsafe fn connection_y() -> usize {
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	let other = link.edges.keys().nth(CURRENT_LINK_EDGE).unwrap();
-	hpa_map().links[&other].pos.y
+	other_link().pos.y
 }
 #[no_mangle]
 pub unsafe fn connection_cost() -> Cost {
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	link.edges.values().nth(CURRENT_LINK_EDGE).unwrap().cost
+	other_link_cost()
 }
 #[no_mangle]
 pub unsafe fn next_connection() -> bool {
 	CURRENT_LINK_EDGE += 1;
-	let mut links = hpa_map().links.values();
-	let link = links.nth(CURRENT_LINK_INDEX).unwrap();
-	CURRENT_LINK_EDGE < link.edges.len()
+	let link = current_link();
+	CURRENT_LINK_EDGE < link.paths.len() as i32
 }
 
 fn grow(material: Material, src: Material, neighbor: Material, odd_increase: f64) {

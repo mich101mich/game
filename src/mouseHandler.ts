@@ -1,9 +1,11 @@
 
 import { Game } from "./game";
-import { GamePos, Rect } from "./geometry/mod";
+import { GamePos } from "./geometry/pos";
+import { Rect } from "./geometry/rect";
 import { Selectable } from "./menu";
-import { Tile, TileType } from "./tile";
-import { Machine, MachineType } from "./machine";
+import { Machine, MachineType } from "./world/machine";
+import { Tile } from "./world/tile";
+import { World } from "./world/world";
 
 export enum MouseMode {
 	Default,
@@ -37,7 +39,7 @@ export class MouseHandler {
 
 		this.element = element;
 		this.onNewSelection = onNewSelection;
-		const mid = new GamePos(Game.GAME_WIDTH, Game.GAME_HEIGHT).scale(1 / 2);
+		const mid = new GamePos(Game.width, Game.height).scale(1 / 2);
 		const screenMid = new GamePos(Game.SCREEN_WIDTH, Game.SCREEN_HEIGHT).scale(1 / 2);
 		this.offset = screenMid.minus(mid);
 
@@ -148,7 +150,7 @@ export class MouseHandler {
 		if (up && this.eventRelevant) {
 			if (this.mouseMode == MouseMode.WorkerSelection) {
 				const rect = new Rect(this.startPos, pos);
-				for (const worker of Game.workers) {
+				for (const worker of Game.scheduler.workers) {
 					if (rect.intersects(worker.getOutline())) {
 						this.selection.add(worker);
 					}
@@ -182,7 +184,7 @@ export class MouseHandler {
 				if (tile && tile.isVisible()
 					&& tile.isDrillable()
 					&& tile.isSelectable()
-					&& (tile.pos.mid().toGamePos().distance(pos) < this.brushSize + Game.cellSize / 2
+					&& (tile.pos.mid().toGamePos().distance(pos) < this.brushSize + World.tileSize / 2
 						|| tile.pos.toGamePos().distance(pos) < this.brushSize
 						|| tile.pos.plus(1, 0).toGamePos().distance(pos) < this.brushSize
 						|| tile.pos.plus(0, 1).toGamePos().distance(pos) < this.brushSize
@@ -214,7 +216,7 @@ export class MouseHandler {
 			}
 		} else if (this.mouseMode == MouseMode.PlacePlatform) {
 			const mouseTarget = this.mouse.toTilePos();
-			context.drawImage(Game.assets, TileType.Platform * 16, 0, 16, 16, mouseTarget.x * cellSize, mouseTarget.y * cellSize, cellSize, cellSize);
+			World.drawMachine(context, MachineType.Platform, new Rect(mouseTarget.toGamePos(), cellSize, cellSize));
 			if (!Game.isFree(mouseTarget)) {
 				context.fillStyle = "rgba(255, 0, 0, 0.5)";
 				context.fillRect(mouseTarget.x * cellSize, mouseTarget.y * cellSize, cellSize, cellSize);
