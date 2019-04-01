@@ -30,11 +30,11 @@ impl HPAMap {
 				let pos = Point::new(x, y) * CHUNK_SIZE;
 
 				let chunk = {
-					let mut neighbours = [None; 4];
-					neighbours[Dir::UP as usize] = chunks.get(x).and_then(|vec| vec.get(y - 1));
-					neighbours[Dir::LEFT as usize] = chunks.get(x - 1).and_then(|vec| vec.get(y));
+					let mut neighbors = [None; 4];
+					neighbors[Dir::UP as usize] = chunks.get(x).and_then(|vec| vec.get(y - 1));
+					neighbors[Dir::LEFT as usize] = chunks.get(x - 1).and_then(|vec| vec.get(y));
 
-					Chunk::new(pos, materials, neighbours, &mut links, &mut next_id)
+					Chunk::new(pos, materials, neighbors, &mut links, &mut next_id)
 				};
 				chunks[x].push(chunk);
 			}
@@ -91,14 +91,14 @@ impl HPAMap {
 			for id in marked {
 				if let Some(link) = self.links.remove(&id) {
 					for outgoing in link.edges() {
-						if let Some(neighbour) = self.links.get_mut(&outgoing) {
-							neighbour.edges.remove(&id);
+						if let Some(neighbor) = self.links.get_mut(&outgoing) {
+							neighbor.edges.remove(&id);
 						}
 					}
-					for (dir, neighbour) in link.neighbours.iter().enumerate() {
-						if let Some(neighbour) = neighbour {
-							if let Some(neighbour) = self.links.get_mut(neighbour) {
-								neighbour.neighbours[(dir + 2) % 4] = None;
+					for (dir, neighbor) in link.neighbors.iter().enumerate() {
+						if let Some(neighbor) = neighbor {
+							if let Some(neighbor) = self.links.get_mut(neighbor) {
+								neighbor.neighbors[(dir + 2) % 4] = None;
 							}
 						}
 					}
@@ -111,9 +111,9 @@ impl HPAMap {
 				if point.x >= self.width || point.y >= self.height {
 					continue;
 				}
-				let mut use_neighbour = [true; 4];
-				use_neighbour[(dir + 2) % 4] = false;
-				let chunk = self.create_chunk(point, use_neighbour, materials);
+				let mut use_neighbor = [true; 4];
+				use_neighbor[(dir + 2) % 4] = false;
+				let chunk = self.create_chunk(point, use_neighbor, materials);
 				self.chunks[point.x][point.y] = chunk;
 			}
 		}
@@ -126,7 +126,7 @@ impl HPAMap {
 	fn create_chunk(
 		&mut self,
 		point: Point,
-		use_neighbour: [bool; 4],
+		use_neighbor: [bool; 4],
 		materials: &Materials,
 	) -> Chunk {
 		let pos = point * CHUNK_SIZE;
@@ -134,9 +134,9 @@ impl HPAMap {
 
 		let chunks = &self.chunks;
 
-		let mut neighbours = [None; 4];
-		for i in (0..4).filter(|&i| use_neighbour[i]) {
-			neighbours[i] = point
+		let mut neighbors = [None; 4];
+		for i in (0..4).filter(|&i| use_neighbor[i]) {
+			neighbors[i] = point
 				.get_in_dir(i.into())
 				.and_then(|p| chunks.get(p.x).and_then(|vec| vec.get(p.y)));
 		}
@@ -144,7 +144,7 @@ impl HPAMap {
 		Chunk::new(
 			pos,
 			materials,
-			neighbours,
+			neighbors,
 			&mut self.links,
 			&mut self.next_id,
 		)
@@ -232,7 +232,7 @@ impl HPAMap {
 		}
 
 		// check if we need to insert temp links in other chunks
-		for other_pos in point.neighbours() {
+		for other_pos in point.neighbors() {
 			if other_pos / CHUNK_SIZE == point / CHUNK_SIZE
 				|| materials[other_pos.x][other_pos.y].is_solid()
 			{
@@ -245,11 +245,11 @@ impl HPAMap {
 			self.links
 				.get_mut(&id)
 				.unwrap()
-				.add_neighbour(point.get_dir_to(other_pos).into(), other_id);
+				.add_neighbor(point.get_dir_to(other_pos).into(), other_id);
 			self.links
 				.get_mut(&other_id)
 				.unwrap()
-				.add_neighbour(other_pos.get_dir_to(point).into(), id);
+				.add_neighbor(other_pos.get_dir_to(point).into(), id);
 		}
 
 		id
@@ -264,11 +264,11 @@ impl HPAMap {
 
 		for id in marked {
 			for dir in 0..4 {
-				if let Some(neighbour_id) = self.links[&id].neighbours[dir] {
+				if let Some(neighbor_id) = self.links[&id].neighbors[dir] {
 					self.links
-						.get_mut(&neighbour_id)
+						.get_mut(&neighbor_id)
 						.unwrap()
-						.remove_neighbour((dir + 2) % 4);
+						.remove_neighbor((dir + 2) % 4);
 				}
 			}
 		}
@@ -292,14 +292,14 @@ impl HPAMap {
 
 		let links = &self.links;
 
-		let get_all_neighbours = |id: LinkId| links[&id].edges();
+		let get_all_neighbors = |id: LinkId| links[&id].edges();
 
 		let get_cost = |id1: LinkId, id2: LinkId| links[&id1].path_to(id2).unwrap().cost;
 
 		let is_walkable = |_| true;
 
 		a_star_search(
-			get_all_neighbours,
+			get_all_neighbors,
 			get_cost,
 			is_walkable,
 			start,
@@ -351,14 +351,14 @@ impl HPAMap {
 
 		let links = &self.links;
 
-		let get_all_neighbours = |id: LinkId| links[&id].edges();
+		let get_all_neighbors = |id: LinkId| links[&id].edges();
 
 		let get_cost = |id1: LinkId, id2: LinkId| links[&id1].path_to(id2).unwrap().cost;
 
 		let is_walkable = |_| true;
 
 		self.flood_goal_data = dijkstra_search(
-			get_all_neighbours,
+			get_all_neighbors,
 			get_cost,
 			is_walkable,
 			start_id,

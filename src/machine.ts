@@ -78,7 +78,7 @@ export class Machine implements Selectable, ResourceListener {
 			}
 			Game.resources.addListener(this);
 		} else {
-			if (this.neighbourMachines().find(m => m.power)) {
+			if (this.neighborMachines().find(m => m.power)) {
 				this.setPower(true);
 			}
 		}
@@ -100,7 +100,7 @@ export class Machine implements Selectable, ResourceListener {
 		}
 	}
 
-	freeNeighbour(): TilePos {
+	freeNeighbor(): TilePos | null {
 		for (let i = 0; i < 4; i++) {
 			const pos = new TilePos(this.pos);
 			pos.move(i);
@@ -111,7 +111,7 @@ export class Machine implements Selectable, ResourceListener {
 		return null;
 	}
 
-	private neighbourMachines(): Machine[] {
+	private neighborMachines(): Machine[] {
 		return [Dir.UP, Dir.RIGHT, Dir.DOWN, Dir.LEFT]
 			.map(dir => new TilePos(this.pos).move(dir))
 			.map(pos => Game.machines.at(pos))
@@ -154,11 +154,11 @@ export class Machine implements Selectable, ResourceListener {
 		if (this.givesPower() && !power) {
 			return;
 		}
-		let neighbours = this.neighbourMachines().filter(m => m.conducts());
+		let neighbors = this.neighborMachines().filter(m => m.conducts());
 
-		if (!power && neighbours.find(m => m.givesPower())) {
+		if (!power && neighbors.find(m => m.givesPower())) {
 			this.power = true;
-			neighbours.forEach(m => {
+			neighbors.forEach(m => {
 				if (!m.power) {
 					m.setPower(true);
 				}
@@ -167,7 +167,7 @@ export class Machine implements Selectable, ResourceListener {
 		}
 
 		this.power = power;
-		for (const machine of neighbours) {
+		for (const machine of neighbors) {
 			machine.setPower(power);
 			if (this.power != power) {
 				// another machine updated us
@@ -197,7 +197,7 @@ export class Machine implements Selectable, ResourceListener {
 		Game.menu.remove(this);
 
 		if (this.power) {
-			for (const machine of this.neighbourMachines()) {
+			for (const machine of this.neighborMachines()) {
 				if (machine.conducts()) {
 					machine.setPower(false);
 				}
@@ -252,7 +252,7 @@ export class Machine implements Selectable, ResourceListener {
 					this.levelupCost.amount.set(ItemType.Ore, (this.level + 2) * 5);
 					return false;
 				},
-				enabled: () => this.ready() && this.levelupCost.isAvaillable(),
+				enabled: () => this.ready() && this.levelupCost.isAvailable(),
 				hotkeys: ["u", "+"]
 			});
 		}
@@ -262,7 +262,7 @@ export class Machine implements Selectable, ResourceListener {
 				name: "Spawn Worker",
 				callback: () => {
 					this.options.workDone = () => {
-						const pos = this.freeNeighbour();
+						const pos = this.freeNeighbor();
 						if (pos) {
 							Game.workers.add(new Worker(pos));
 						} else {
@@ -272,12 +272,12 @@ export class Machine implements Selectable, ResourceListener {
 					this.cooldown = Math.max(5, 20 - this.level * 2);
 					return false;
 				},
-				enabled: () => this.ready() && Game.workers.hasRoom() && this.freeNeighbour() != null,
+				enabled: () => this.ready() && Game.workers.hasRoom() && this.freeNeighbor() != null,
 				hotkeys: ["s"]
 			});
 		} else if (this.type == MachineType.Lab) {
 			RESEARCH
-				.filter(r => r.availlable())
+				.filter(r => r.available())
 				.map(r => ({
 					name: r.name + "\n" + r.cost.display(),
 					callback: () => {
@@ -289,7 +289,7 @@ export class Machine implements Selectable, ResourceListener {
 						}
 						return false;
 					},
-					enabled: () => this.ready() && r.cost.isAvaillable() && r.availlable(),
+					enabled: () => this.ready() && r.cost.isAvailable() && r.available(),
 					hotkeys: []
 				}))
 				.forEach(o => options.push(o))
@@ -311,7 +311,7 @@ export class Machine implements Selectable, ResourceListener {
 	static debugMode() {
 		for (const r of RESEARCH) {
 			for (let i = 0; i < 20; i++) {
-				if (r.availlable()) {
+				if (r.available()) {
 					r.onResearched();
 					if (r.costIncrease) {
 						r.cost = r.costIncrease(r.cost);
@@ -327,7 +327,7 @@ const RESEARCH: {
 	cost: Cost,
 	time: number,
 	onResearched: () => void,
-	availlable: () => boolean,
+	available: () => boolean,
 	costIncrease?: (current: Cost) => Cost,
 }[] = [
 		{
@@ -337,7 +337,7 @@ const RESEARCH: {
 			onResearched: () => {
 				Game.drillLevel++;
 			},
-			availlable: () => Game.drillLevel < 2,
+			available: () => Game.drillLevel < 2,
 			costIncrease: (current: Cost) => {
 				for (const [type, count] of current.amount) {
 					current.amount.set(type, count * 2);
@@ -352,9 +352,9 @@ const RESEARCH: {
 			onResearched: () => {
 				Game.drillSpeed++;
 			},
-			availlable: () => true,
+			available: () => true,
 			costIncrease: (current: Cost) => {
-				return new Cost({ ore: current.amount.get(ItemType.Ore) + 20 });
+				return new Cost({ ore: current.amount.get(ItemType.Ore)! + 20 });
 			},
 		},
 		{
@@ -364,9 +364,9 @@ const RESEARCH: {
 			onResearched: () => {
 				Game.workers.capacity += 10;
 			},
-			availlable: () => true,
+			available: () => true,
 			costIncrease: (current: Cost) => {
-				return new Cost({ crystal: current.amount.get(ItemType.Crystal) * 2 });
+				return new Cost({ crystal: current.amount.get(ItemType.Crystal)! * 2 });
 			},
 		},
 		{
@@ -376,7 +376,7 @@ const RESEARCH: {
 			onResearched: () => {
 				Game.gameSpeed -= 20;
 			},
-			availlable: () => Game.gameSpeed > 40,
+			available: () => Game.gameSpeed > 40,
 			costIncrease: (current: Cost) => {
 				for (const [type, count] of current.amount) {
 					current.amount.set(type, count * 2);

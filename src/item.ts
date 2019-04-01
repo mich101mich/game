@@ -14,9 +14,9 @@ export enum ItemType {
 export class Item implements Selectable {
 	pos: GamePos;
 	type: ItemType;
-	worker: Worker = null;
-	request: Request;
-	constructor(pos: GamePos, type: ItemType, request: Request) {
+	worker: Worker | null = null;
+	request: Request | null;
+	constructor(pos: GamePos, type: ItemType, request: Request | null = null) {
 		this.type = type;
 		this.pos = pos;
 		this.request = request;

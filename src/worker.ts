@@ -10,8 +10,8 @@ const SIZE_OFFSET = 3;
 
 export class Worker implements Selectable {
 	pos: TilePos;
-	job: Job;
-	item: Item;
+	job: Job | null;
+	item: Item | null;
 	pathLen: number;
 	moveDelay: number = 0;
 	totalMoveDelay: number = 0;
@@ -36,9 +36,13 @@ export class Worker implements Selectable {
 			}
 		}
 
-		let path: Path = null;
+		let path: Path | null = null;
 
 		if (!this.job && this.item) {
+			if (!this.item.request) {
+				this.dropItem();
+				return;
+			}
 			if (this.pos.distance(this.item.request.target.pos) <= 1) {
 				this.item.request.deliverItem(this.item);
 				return;
@@ -68,7 +72,7 @@ export class Worker implements Selectable {
 		this.moveDelay = this.totalMoveDelay = Tile.at(this.pos).getWalkCost();
 		this.pathLen = path.length;
 	}
-	private findJob(): Path {
+	private findJob(): Path | null {
 		if (this.item) {
 			return null;
 		}
@@ -85,9 +89,9 @@ export class Worker implements Selectable {
 		}
 		return null;
 	}
-	setJob(job: Job, pathLen: number = -1) {
+	setJob(job: Job | null, pathLen: number = -1) {
 		if (this.job) {
-			this.job.worker = null;
+			this.job.worker = undefined;
 		}
 		this.job = job;
 		if (job) {
@@ -119,14 +123,16 @@ export class Worker implements Selectable {
 	dropItem() {
 		if (this.item) {
 			this.item.worker = null;
-			this.item.request.removeItem(this.item);
+			if (this.item.request) {
+				this.item.request.removeItem(this.item);
+			}
 		}
 		this.item = null;
 	}
 
 	remove() {
 		if (this.job) {
-			this.job.worker = null;
+			this.job.worker = undefined;
 			this.job = null;
 		}
 		Game.workers.remove(this);

@@ -12,7 +12,7 @@ pub struct InterLink {
 	pub walk_cost: Cost,
 	pub is_temp: bool,
 	pub sides: [bool; 4],
-	pub neighbours: [Option<LinkId>; 4],
+	pub neighbors: [Option<LinkId>; 4],
 	pub edges: HashMap<LinkId, Path<Point>>,
 	pub temp_edges: HashMap<LinkId, Path<Point>>,
 }
@@ -23,7 +23,7 @@ impl InterLink {
 		pos: Point,
 		walk_cost: Cost,
 		sides: [bool; 4],
-		neighbours: [Option<LinkId>; 4],
+		neighbors: [Option<LinkId>; 4],
 	) -> InterLink {
 		InterLink {
 			id,
@@ -32,7 +32,7 @@ impl InterLink {
 			walk_cost,
 			is_temp: false,
 			sides,
-			neighbours,
+			neighbors,
 			edges: HashMap::new(),
 			temp_edges: HashMap::new(),
 		}
@@ -42,31 +42,31 @@ impl InterLink {
 		pos: Point,
 		walk_cost: Cost,
 		sides: [bool; 4],
-		neighbours: [Option<LinkId>; 4],
+		neighbors: [Option<LinkId>; 4],
 	) -> InterLink {
 		InterLink {
 			is_temp: true,
-			..InterLink::new(id, pos, walk_cost, sides, neighbours)
+			..InterLink::new(id, pos, walk_cost, sides, neighbors)
 		}
 	}
-	pub fn add_neighbour(&mut self, dir: usize, neighbour: LinkId) {
+	pub fn add_neighbor(&mut self, dir: usize, neighbor: LinkId) {
 		self.sides[dir] = true;
-		self.neighbours[dir] = Some(neighbour);
+		self.neighbors[dir] = Some(neighbor);
 		self.edges.insert(
-			neighbour,
+			neighbor,
 			Path::new(
 				vec![self.pos, self.pos.get_in_dir(dir.into()).unwrap()],
 				self.walk_cost,
 			),
 		);
 	}
-	pub fn remove_neighbour(&mut self, dir: usize) {
+	pub fn remove_neighbor(&mut self, dir: usize) {
 		self.sides[dir] = false;
-		if let Some(neighbour) = self.neighbours[dir] {
-			self.edges.remove(&neighbour);
-			self.temp_edges.remove(&neighbour);
+		if let Some(neighbor) = self.neighbors[dir] {
+			self.edges.remove(&neighbor);
+			self.temp_edges.remove(&neighbor);
 		}
-		self.neighbours[dir] = None;
+		self.neighbors[dir] = None;
 	}
 	pub fn clear_temp(&mut self) {
 		self.temp_edges.clear();

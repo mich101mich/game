@@ -49,7 +49,8 @@ export class Tile implements Selectable {
 		return this.getData().selectable;
 	}
 	isDrillable(): boolean {
-		return this.getData().drillLevel !== undefined && this.getData().drillLevel <= Game.drillLevel;
+		const drillLevel = this.getData().drillLevel;
+		return drillLevel !== undefined && drillLevel <= Game.drillLevel;
 	}
 	remove() {
 		const drops = this.getData().drops || [];
@@ -113,7 +114,7 @@ export class Tile implements Selectable {
 	}
 	static at(x: number, y: number): Tile;
 	static at(pos: TilePos): Tile;
-	static at(pos: number | TilePos, y?: number) {
+	static at(pos: number | TilePos, y: number = 0) {
 		if (!(pos instanceof TilePos)) {
 			pos = new TilePos(pos, y);
 		}

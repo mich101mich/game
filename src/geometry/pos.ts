@@ -113,7 +113,7 @@ export class TilePos extends Pos {
 	}
 	plus(pos: TilePos): TilePos;
 	plus(x: number, y: number): TilePos;
-	plus(x: TilePos | number, y?: number): TilePos {
+	plus(x: TilePos | number, y: number = 0): TilePos {
 		if (x instanceof TilePos) {
 			return new TilePos(this.x + x.x, this.y + x.y);
 		} else {
@@ -122,7 +122,7 @@ export class TilePos extends Pos {
 	}
 	minus(pos: TilePos): TilePos;
 	minus(x: number, y: number): TilePos;
-	minus(x: TilePos | number, y?: number): TilePos {
+	minus(x: TilePos | number, y: number = 0): TilePos {
 		if (x instanceof TilePos) {
 			return new TilePos(this.x - x.x, this.y - x.y);
 		} else {
@@ -147,7 +147,7 @@ export class TilePos extends Pos {
 		return new GamePos(pos.x, pos.y);
 	}
 	/**
-	 * returns the Manhatten distance between this and other
+	 * returns the Manhattan distance between this and other
 	 * @param other the other Pos
 	 */
 	distance(other: TilePos): number {
@@ -170,7 +170,7 @@ export class GamePos extends Pos {
 	}
 	plus(pos: GamePos): GamePos;
 	plus(x: number, y: number): GamePos;
-	plus(x: GamePos | number, y?: number): GamePos {
+	plus(x: GamePos | number, y: number = 0): GamePos {
 		if (x instanceof GamePos) {
 			return new GamePos(this.x + x.x, this.y + x.y);
 		} else {
@@ -179,7 +179,7 @@ export class GamePos extends Pos {
 	}
 	minus(pos: GamePos): GamePos;
 	minus(x: number, y: number): GamePos;
-	minus(x: GamePos | number, y?: number): GamePos {
+	minus(x: GamePos | number, y: number = 0): GamePos {
 		if (x instanceof GamePos) {
 			return new GamePos(this.x - x.x, this.y - x.y);
 		} else {
@@ -190,7 +190,7 @@ export class GamePos extends Pos {
 		return new GamePos(this.x * factor, this.y * factor);
 	}
 	/**
-	 * returns the Euclidian distance between this and other
+	 * returns the Euclidean distance between this and other
 	 * @param other the other Pos
 	 */
 	distance(other: GamePos): number {

@@ -13,8 +13,8 @@ where
 	vector.insert(pos, element);
 }
 
-pub fn a_star_search<Id, GetNeighbours, NeighbourIter, GetCost, IsWalkable, Heuristic>(
-	get_all_neighbours: GetNeighbours,
+pub fn a_star_search<Id, GetNeighbors, NeighborIter, GetCost, IsWalkable, Heuristic>(
+	get_all_neighbors: GetNeighbors,
 	get_cost: GetCost,
 	is_walkable: IsWalkable,
 	start: Id,
@@ -23,8 +23,8 @@ pub fn a_star_search<Id, GetNeighbours, NeighbourIter, GetCost, IsWalkable, Heur
 ) -> Option<Path<Id>>
 where
 	Id: Copy + ::std::cmp::Eq + ::std::hash::Hash,
-	GetNeighbours: Fn(Id) -> NeighbourIter,
-	NeighbourIter: Iterator<Item = Id>,
+	GetNeighbors: Fn(Id) -> NeighborIter,
+	NeighborIter: Iterator<Item = Id>,
 	GetCost: Fn(Id, Id) -> Cost,
 	Heuristic: Fn(Id) -> Cost,
 	IsWalkable: Fn(Id) -> bool,
@@ -42,7 +42,7 @@ where
 		}
 		let current_cost = visited[&current_id].0;
 
-		for other_id in get_all_neighbours(current_id) {
+		for other_id in get_all_neighbors(current_id) {
 			let other_cost = current_cost + get_cost(current_id, other_id);
 
 			if !is_walkable(other_id) {
@@ -93,8 +93,8 @@ where
 	Some(Path::new(steps, visited[&goal].0))
 }
 
-pub fn dijkstra_search<Id, GetNeighbours, NeighbourIter, GetCost, IsWalkable>(
-	get_all_neighbours: GetNeighbours,
+pub fn dijkstra_search<Id, GetNeighbors, NeighborIter, GetCost, IsWalkable>(
+	get_all_neighbors: GetNeighbors,
 	get_cost: GetCost,
 	is_walkable: IsWalkable,
 	start: Id,
@@ -102,8 +102,8 @@ pub fn dijkstra_search<Id, GetNeighbours, NeighbourIter, GetCost, IsWalkable>(
 ) -> HashMap<Id, Path<Id>>
 where
 	Id: Copy + ::std::cmp::Eq + ::std::hash::Hash + ::std::fmt::Debug,
-	GetNeighbours: Fn(Id) -> NeighbourIter,
-	NeighbourIter: Iterator<Item = Id>,
+	GetNeighbors: Fn(Id) -> NeighborIter,
+	NeighborIter: Iterator<Item = Id>,
 	GetCost: Fn(Id, Id) -> Cost,
 	IsWalkable: Fn(Id) -> bool,
 {
@@ -136,7 +136,7 @@ where
 			break;
 		}
 
-		for other_id in get_all_neighbours(current_id) {
+		for other_id in get_all_neighbors(current_id) {
 			let other_cost = cost + get_cost(current_id, other_id);
 
 			if !is_walkable(other_id) {

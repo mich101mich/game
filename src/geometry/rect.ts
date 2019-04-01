@@ -10,7 +10,7 @@ export class Rect {
 	constructor(leftTop: GamePos, width: number, height: number);
 	constructor(leftTop: GamePos, rightBottom: GamePos);
 
-	constructor(x: number | GamePos, y: number | GamePos, width?: number, height?: number) {
+	constructor(x: number | GamePos, y: number | GamePos, width: number = 0, height: number = 0) {
 		if (x instanceof GamePos) {
 			if (y instanceof GamePos) {
 				this.x = Math.min(x.x, y.x);

@@ -14,7 +14,7 @@ impl Chunk {
 	pub fn new(
 		pos: Point,
 		materials: &Materials,
-		neighbours: [Option<&Chunk>; 4],
+		neighbors: [Option<&Chunk>; 4],
 		all_links: &mut HashMap<LinkId, InterLink>,
 		next_id: &mut LinkId,
 	) -> Chunk {
@@ -23,7 +23,7 @@ impl Chunk {
 		for dir in 0..4 {
 			let opp_dir = (dir + 2) % 4;
 
-			if let Some(other) = neighbours[dir] {
+			if let Some(other) = neighbors[dir] {
 				let opposites = other
 					.links
 					.iter()
@@ -41,11 +41,11 @@ impl Chunk {
 						all_links
 							.get_mut(corner)
 							.unwrap()
-							.add_neighbour(dir, *opposite);
+							.add_neighbor(dir, *opposite);
 						all_links
 							.get_mut(opposite)
 							.unwrap()
-							.add_neighbour(opp_dir, *corner);
+							.add_neighbor(opp_dir, *corner);
 
 						found_corner = true;
 						break;
@@ -56,19 +56,19 @@ impl Chunk {
 
 					let mut link = {
 						let mut sides = [false; 4];
-						let mut neighbours = [None; 4];
+						let mut neighbors = [None; 4];
 						sides[dir] = true;
-						neighbours[dir] = Some(*opposite);
+						neighbors[dir] = Some(*opposite);
 						let walk_cost = materials[point.x][point.y].walk_cost();
-						InterLink::new(*next_id, point, walk_cost, sides, neighbours)
+						InterLink::new(*next_id, point, walk_cost, sides, neighbors)
 					};
 					*next_id += 1;
 
-					link.add_neighbour(dir, *opposite);
+					link.add_neighbor(dir, *opposite);
 					all_links
 						.get_mut(opposite)
 						.unwrap()
-						.add_neighbour(opp_dir, link.id);
+						.add_neighbor(opp_dir, link.id);
 
 					links.push(link.id);
 					all_links.insert(link.id, link);
@@ -228,8 +228,8 @@ impl Chunk {
 		let right = left + CHUNK_SIZE;
 		let bottom = top + CHUNK_SIZE;
 
-		let get_all_neighbours = |p: Point| {
-			p.neighbours()
+		let get_all_neighbors = |p: Point| {
+			p.neighbors()
 				.filter(|o| o.x >= left && o.y >= top && o.x < right && o.y < bottom)
 		};
 
@@ -237,7 +237,7 @@ impl Chunk {
 
 		let is_walkable = |p: Point| !materials[p.x][p.y].is_solid();
 
-		dijkstra_search(get_all_neighbours, get_cost, is_walkable, start, goals)
+		dijkstra_search(get_all_neighbors, get_cost, is_walkable, start, goals)
 	}
 
 	pub fn a_star(&self, start: Point, end: Point, materials: &Materials) -> Option<Path<Point>> {
@@ -246,8 +246,8 @@ impl Chunk {
 		let right = left + CHUNK_SIZE;
 		let bottom = top + CHUNK_SIZE;
 
-		let get_all_neighbours = |p: Point| {
-			p.neighbours()
+		let get_all_neighbors = |p: Point| {
+			p.neighbors()
 				.filter(|o| o.x >= left && o.y >= top && o.x < right && o.y < bottom)
 		};
 
@@ -255,7 +255,7 @@ impl Chunk {
 
 		let is_walkable = |p: Point| !materials[p.x][p.y].is_solid();
 
-		a_star_search(get_all_neighbours, get_cost, is_walkable, start, end, |p| {
+		a_star_search(get_all_neighbors, get_cost, is_walkable, start, end, |p| {
 			p.dist(&end) as Cost
 		})
 	}

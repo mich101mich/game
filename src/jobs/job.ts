@@ -11,7 +11,7 @@ export class Job {
 	range: number;
 	duration: number;
 	priority: number;
-	worker: Worker;
+	worker: Worker | undefined;
 	resolve: (worker: Worker) => void;
 	checkValid: (worker?: Worker) => boolean;
 	constructor(
@@ -28,17 +28,20 @@ export class Job {
 		this.range = data.range || 0;
 		this.duration = data.duration;
 		this.priority = data.priority || 0;
-		this.worker = null;
+		this.worker = undefined;
 		this.resolve = resolve;
 		this.checkValid = checkValid;
 	}
 	hasWorker(): boolean {
-		return this.worker !== null;
+		return this.worker !== undefined;
 	}
 	isValid(): boolean {
 		return this.checkValid(this.worker);
 	}
 	work() {
+		if (!this.worker) {
+			throw new Error("Job worked without Worker");
+		}
 		if (!this.isValid()) {
 			this.remove();
 			return;
@@ -56,7 +59,7 @@ export class Job {
 	remove() {
 		if (this.worker) {
 			this.worker.job = null;
-			this.worker = null;
+			this.worker = undefined;
 		}
 		Game.jobs.remove(this);
 	}

@@ -38,13 +38,13 @@ export class Resources {
 			listener.onRemove(resource, prev, this.get(resource));
 		}
 	}
-	spawnItem(type: ItemType, request: Request, spawn?: Machine): Item {
+	spawnItem(type: ItemType, request: Request, spawn: Machine | null = null): Item | null {
 		if (this.get(type) == 0) {
 			return null;
 		}
 		if (!spawn) {
 			const spawns = Game.machines.spawns()
-				.filter(s => s.freeNeighbour() != null);
+				.filter(s => s.freeNeighbor() != null);
 
 			spawn = Path.nearest(request.target.pos, spawns, s => s.pos);
 		}
@@ -53,7 +53,11 @@ export class Resources {
 			return null;
 		}
 		this.remove(type, 1);
-		return Game.items.create(spawn.freeNeighbour().mid(), type, request);
+		const target = spawn.freeNeighbor();
+		if (!target) {
+			throw new Error("Spawn blocked");
+		}
+		return Game.items.create(target.mid(), type, request);
 	}
 	draw() {
 		let text = "";

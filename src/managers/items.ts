@@ -17,7 +17,7 @@ export class Items extends Collection<Item> implements ResourceListener {
 		this.requests.push(new Request(machine, cost, priority));
 	}
 
-	create(pos: GamePos, type: ItemType, request?: Request): Item {
+	create(pos: GamePos, type: ItemType, request: Request | null = null): Item {
 
 		if (!request) {
 			const wanted = this.unresolved.filter(r => r.type == type);
@@ -35,7 +35,7 @@ export class Items extends Collection<Item> implements ResourceListener {
 					this.unresolved.remove(target);
 				}
 			} else {
-				request = this.unresolved.find(u => u.amount == Infinity).request;
+				request = null;
 			}
 		}
 		const item = new Item(pos, type, request);
@@ -82,7 +82,7 @@ export class Request {
 			this.requestItem(type, count);
 		});
 	}
-	private requestItem(type: ItemType, count: number): Item {
+	private requestItem(type: ItemType, count: number) {
 		const items = [...Game.items]
 			.filter(item => item.type == type)
 			.filter(item => item.request == null
@@ -90,7 +90,7 @@ export class Request {
 
 		let spawns: (Item | Machine)[] = [];
 		if (this.priority < 100 && Game.resources.get(type) > 0) {
-			spawns = Game.machines.spawns().filter(s => s.freeNeighbour() != null);
+			spawns = Game.machines.spawns().filter(s => s.freeNeighbor() != null);
 		}
 		const sources = spawns.concat(items);
 
@@ -107,11 +107,11 @@ export class Request {
 			const source = sourcePaths[0].obj;
 			let item;
 			if (source instanceof Machine) {
-				if (Game.resources.get(type) == 0) {
+				item = Game.resources.spawnItem(type, this, source);
+				if (!item) {
 					sourcePaths.removeAt(0);
 					continue;
 				}
-				item = Game.resources.spawnItem(type, this, source);
 			} else {
 				if (source.request) {
 					const path = Path.generate(source.pos.toTilePos(), source.request.target.pos);

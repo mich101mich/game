@@ -175,11 +175,11 @@ export class Game {
 
 	static draw() {
 		const context = Game.canvas.getContext("2d");
+		if (!context) {
+			throw new Error("Canvas 2d-Mode not supported");
+		}
 
 		context.imageSmoothingEnabled = false;
-		context.oImageSmoothingEnabled = false;
-		context.mozImageSmoothingEnabled = false;
-		context.webkitImageSmoothingEnabled = false;
 
 		context.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -245,6 +245,10 @@ export class Game {
 		Game.backgroundDirty = false;
 
 		const context = Game.background.getContext("2d");
+		if (!context) {
+			throw new Error("Canvas 2d-Mode not supported");
+		}
+
 		context.fillStyle = "black";
 		context.fillRect(0, 0, Game.GAME_WIDTH, Game.GAME_HEIGHT);
 		context.fillStyle = "white";
@@ -263,7 +267,7 @@ export class Game {
 							const type = Game.wasm.get(other.x, other.y);
 							return type == TileType.Platform || type == TileType.Machine;
 						})
-							.map(hasNeighbour => hasNeighbour ? 1 : 0)
+							.map(hasNeighbor => hasNeighbor ? 1 : 0)
 							.reduceRight((prev, curr) => (prev << 1) | curr, 0);
 						context.drawImage(Game.assets, variant * 16, 32, 16, 16, pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 					} else {
@@ -368,7 +372,7 @@ export class Game {
 		return true;
 	}
 
-	static getSelectableAt(gamePos: GamePos): Selectable {
+	static getSelectableAt(gamePos: GamePos): Selectable | null {
 		if (!gamePos.isValid()) {
 			return null;
 		}

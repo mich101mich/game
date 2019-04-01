@@ -27,7 +27,7 @@ export class Cost {
 				.join(", ")
 			+ ")";
 	}
-	isAvaillable() {
+	isAvailable() {
 		for (const [type, count] of this.amount) {
 			if (Game.resources.get(type) < count) {
 				return false;
@@ -45,6 +45,9 @@ export class Cost {
 	}
 	remove(type: ItemType, count = 1) {
 		let current = this.amount.get(type);
+		if (current == undefined) {
+			throw new Error("Attempt to remove non-available ItemType " + ItemType[type] + " from " + this);
+		}
 		current = Math.max(0, current - count);
 		if (current == 0) {
 			this.amount.delete(type);

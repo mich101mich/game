@@ -40,7 +40,7 @@ export class Machines implements Iterable<Machine>{
 
 	at(pos: TilePos): Machine;
 	at(x: number, y: number): Machine;
-	at(pos: TilePos | number, y?: number): Machine {
+	at(pos: TilePos | number, y: number = 0): Machine {
 		if (!(pos instanceof TilePos)) {
 			pos = new TilePos(pos, y);
 		}

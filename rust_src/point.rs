@@ -53,19 +53,19 @@ impl Point {
 			return Dir::UP;
 		}
 	}
-	pub fn neighbours(&self) -> Neighbours {
-		Neighbours::new(*self)
+	pub fn neighbors(&self) -> Neighbors {
+		Neighbors::new(*self)
 	}
 }
 
 #[derive(Debug)]
-pub struct Neighbours(Point, usize);
-impl Neighbours {
-	pub fn new(point: Point) -> Neighbours {
-		Neighbours(point, 0)
+pub struct Neighbors(Point, usize);
+impl Neighbors {
+	pub fn new(point: Point) -> Neighbors {
+		Neighbors(point, 0)
 	}
 }
-impl ::std::iter::Iterator for Neighbours {
+impl ::std::iter::Iterator for Neighbors {
 	type Item = Point;
 	fn next(&mut self) -> Option<Point> {
 		if self.1 >= 4 {

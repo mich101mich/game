@@ -24,7 +24,7 @@ export class Path {
 	 * @param start the start Point
 	 * @param end the end Point
 	 */
-	static generate(start: TilePos, end: TilePos): Path {
+	static generate(start: TilePos, end: TilePos): Path | null {
 		if (start.x == end.x && start.y == end.y) {
 			return new Path(start, end, 0);
 		}
@@ -62,16 +62,17 @@ export class Path {
 				path: new Path(start, end, length, nextDir)
 			};
 		})
-			.filter(o => o != null);
+			.filter((o): o is { obj: T, path: Path } => o != null);
+
 		Game.wasm.end_flood_search();
 		return ret;
 	}
-	static best<T>(start: TilePos, end: T[], getPos: (t: T) => TilePos, rating: (t: T, length: number) => number): T {
+	static best<T>(start: TilePos, end: T[], getPos: (t: T) => TilePos, rating: (t: T, length: number) => number): T | null {
 		const result = this.gen_all(start, end, getPos)
 			.min(o => rating(o.obj, o.path.length));
 		return result ? result.obj : null;
 	}
-	static nearest<T>(start: TilePos, end: T[], getPos: (t: T) => TilePos): T {
+	static nearest<T>(start: TilePos, end: T[], getPos: (t: T) => TilePos): T | null {
 		for (const t of end) {
 			if (getPos(t).equals(start)) {
 				return t;

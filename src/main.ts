@@ -50,7 +50,7 @@ declare global {
 	}
 }
 
-Array.prototype.min = function <T>(this: Array<T>, indicator?: (t: T) => number): T {
+Array.prototype.min = function <T>(this: Array<T>, indicator?: (t: T) => number): T | null {
 	if (this.length == 0) {
 		return null;
 	}
@@ -73,7 +73,7 @@ Array.prototype.remove = function <T>(this: Array<T>, element: T): boolean {
 	return index != -1;
 }
 
-Array.prototype.removeAt = function <T>(this: Array<T>, index: number): T {
+Array.prototype.removeAt = function <T>(this: Array<T>, index: number): T | null {
 	const result = this.splice(index, 1);
 	return result ? result[0] : null;
 }

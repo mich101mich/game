@@ -100,13 +100,13 @@ pub fn find_path(sx: usize, sy: usize, ex: usize, ey: usize) -> i32 {
 		return -1;
 	}
 
-	let get_all_neighbours = |p: Point| p.neighbours();
+	let get_all_neighbors = |p: Point| p.neighbors();
 
 	let get_cost = |p: Point, _: Point| materials[p.x][p.y].walk_cost();
 
 	let is_walkable = |p: Point| !materials[p.x][p.y].is_solid();
 
-	let result = a_star_search(get_all_neighbours, get_cost, is_walkable, start, end, |p| {
+	let result = a_star_search(get_all_neighbors, get_cost, is_walkable, start, end, |p| {
 		p.dist(&end) as Cost
 	});
 
@@ -360,7 +360,7 @@ pub unsafe fn next_connection() -> bool {
 	CURRENT_LINK_EDGE < link.edges.len()
 }
 
-fn grow(material: Material, src: Material, neighbour: Material, odd_increase: f64) {
+fn grow(material: Material, src: Material, neighbor: Material, odd_increase: f64) {
 	let mut changes = vec![];
 	let materials = materials();
 
@@ -370,16 +370,16 @@ fn grow(material: Material, src: Material, neighbour: Material, odd_increase: f6
 				continue;
 			}
 			let mut odds = 0.0;
-			if x > 0 && materials[x - 1][y] == neighbour {
+			if x > 0 && materials[x - 1][y] == neighbor {
 				odds += odd_increase;
 			}
-			if x < width() - 1 && materials[x + 1][y] == neighbour {
+			if x < width() - 1 && materials[x + 1][y] == neighbor {
 				odds += odd_increase;
 			}
-			if y > 0 && materials[x][y - 1] == neighbour {
+			if y > 0 && materials[x][y - 1] == neighbor {
 				odds += odd_increase;
 			}
-			if y < height() - 1 && materials[x][y + 1] == neighbour {
+			if y < height() - 1 && materials[x][y + 1] == neighbor {
 				odds += odd_increase;
 			}
 			if unsafe { random() } <= odds {

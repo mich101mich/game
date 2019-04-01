@@ -9,7 +9,7 @@ export class PickupItemJob extends Job {
 			item.pos.toTilePos(),
 			{
 				duration: 0,
-				priority: item.request.priority
+				priority: item.request ? item.request.priority : 0
 			},
 			(worker) => {
 				worker.pickUp(item);

@@ -93,7 +93,10 @@ export class Menu {
 
 		while (this.buttons.length > this.options.length) {
 			this.buttons.pop();
-			this.container.removeChild(this.container.children.item(this.container.childElementCount - 1));
+			const item = this.container.children.item(this.container.childElementCount - 1);
+			if (item) {
+				this.container.removeChild(item);
+			}
 		}
 
 		const elements = this.container.getElementsByTagName("button");
@@ -140,7 +143,7 @@ export class Menu {
 				count[des] = (count[des] || 0) + 1;
 				let i = sel.getInfo();
 				if (info != i) {
-					info = null;
+					info = "";
 				}
 			}
 
@@ -148,7 +151,7 @@ export class Menu {
 			for (const desc in count) {
 				description += count[desc] + "x " + desc + "\n";
 			}
-			return description + (info || "");
+			return description + info;
 		}
 	}
 }
