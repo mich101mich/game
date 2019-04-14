@@ -16,17 +16,26 @@
 		},
 		{
 			"type": "shell",
-			"label": "wasm-gc",
-			"command": "wasm-gc",
+			"label": "bindgen",
+			"command": "wasm-bindgen",
 			"args": [
-				"target/wasm32-unknown-unknown/release/game.wasm",
-				"lib.wasm"
+				"target/wasm32-unknown-unknown/release/${workspaceFolderBasename}.wasm",
+				"--out-dir",
+				"src/bindgen",
+				"--out-name",
+				"wasm"
 			],
+			"dependsOn": "cargo build"
+		},
+		{
+			"type": "shell",
+			"label": "webpack",
+			"command": "webpack",
+			"dependsOn": "bindgen",
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			},
-			"dependsOn": "cargo build"
+			}
 		}
 	]
 }

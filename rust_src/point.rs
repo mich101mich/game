@@ -1,6 +1,6 @@
-use rust_src::{Dir, DOWN, LEFT, RIGHT, UP};
+use super::{Dir, DOWN, LEFT, RIGHT, UP};
 
-#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 #[repr(C)]
 pub struct Point {
 	pub x: usize,
@@ -19,38 +19,46 @@ impl Point {
 	}
 	pub fn jump_in_dir(&self, dir: Dir, distance: usize) -> Option<Point> {
 		match dir {
-			UP => if self.y >= distance {
-				Some(Point::new(self.x, self.y - distance))
-			} else {
-				None
-			},
-			DOWN => if self.y + distance < ::height() {
-				Some(Point::new(self.x, self.y + distance))
-			} else {
-				None
-			},
-			LEFT => if self.x >= distance {
-				Some(Point::new(self.x - distance, self.y))
-			} else {
-				None
-			},
-			RIGHT => if self.x + distance < ::width() {
-				Some(Point::new(self.x + distance, self.y))
-			} else {
-				None
-			},
+			UP => {
+				if self.y >= distance {
+					Some(Point::new(self.x, self.y - distance))
+				} else {
+					None
+				}
+			}
+			DOWN => {
+				if self.y + distance < crate::height() {
+					Some(Point::new(self.x, self.y + distance))
+				} else {
+					None
+				}
+			}
+			LEFT => {
+				if self.x >= distance {
+					Some(Point::new(self.x - distance, self.y))
+				} else {
+					None
+				}
+			}
+			RIGHT => {
+				if self.x + distance < crate::width() {
+					Some(Point::new(self.x + distance, self.y))
+				} else {
+					None
+				}
+			}
 			_ => None,
 		}
 	}
 	pub fn get_dir_to(&self, other: Point) -> Dir {
 		if other.x > self.x {
-			return Dir::RIGHT;
+			Dir::RIGHT
 		} else if other.x < self.x {
-			return Dir::LEFT;
+			Dir::LEFT
 		} else if other.y > self.y {
-			return Dir::DOWN;
+			Dir::DOWN
 		} else {
-			return Dir::UP;
+			Dir::UP
 		}
 	}
 	pub fn neighbors(&self) -> Neighbors {
@@ -69,7 +77,7 @@ impl ::std::iter::Iterator for Neighbors {
 	type Item = Point;
 	fn next(&mut self) -> Option<Point> {
 		if self.1 >= 4 {
-			return None;
+			None
 		} else {
 			let ret = self.0.get_in_dir(self.1.into());
 			self.1 += 1;

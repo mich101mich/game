@@ -19,11 +19,11 @@
 	"homepage": "https://github.com/mich101mich/game#readme",
 	"devDependencies": {
 		"ts-loader": "^5.3.3",
-		"webpack": "^4.29.6",
+		"webpack": "^4.30.0",
 		"webpack-cli": "^3.3.0",
 		"webpack-dev-server": "^3.2.1"
 	},
 	"dependencies": {
-		"typescript": "^3.4.1"
+		"typescript": "^3.4.3"
 	}
 }

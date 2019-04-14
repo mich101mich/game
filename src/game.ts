@@ -4,11 +4,11 @@ import { Menus } from "./managers/menus";
 import { Menu, Selectable } from "./menu";
 import { MouseHandler } from "./mouseHandler";
 import { Scheduler } from "./scheduler";
-import { Wasm } from "./wasm";
 import { ItemType } from "./world/item";
 import { Machine, MachineType } from "./world/machine";
-import { Tile, TileType } from "./world/tile";
+import { Tile, Material } from "./world/tile";
 import { World } from "./world/world";
+import { Wasm } from "./main";
 
 export class Game {
 	static mouseHandler: MouseHandler;
@@ -40,8 +40,8 @@ export class Game {
 
 	static init(wasm: Wasm, assets: ImageBitmap) {
 
-		Tile.wasm = wasm;
 		World.init(wasm, assets);
+		Tile.wasm = wasm;
 
 		Game.canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
@@ -252,7 +252,7 @@ export class Game {
 		}
 	}
 
-	static place(pos: TilePos, material: TileType) {
+	static place(pos: TilePos, material: Material) {
 		World.place(pos, material);
 
 		const tile = Tile.at(pos);
@@ -278,7 +278,7 @@ export class Game {
 			return false;
 		}
 		const tile = Tile.at(pos);
-		if (!tile.isVisible() || tile.type != TileType.Air) {
+		if (!tile.isVisible() || tile.type != Material.Air) {
 			return false;
 		}
 		const rect = tile.getOutline();

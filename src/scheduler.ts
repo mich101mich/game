@@ -26,7 +26,7 @@ class Task {
 		this.startTime = startTime;
 	}
 	endTime(): number {
-		return this.startTime + this.path.length + this.job.duration;
+		return this.startTime + this.path.cost + this.job.duration;
 	}
 }
 
@@ -83,23 +83,22 @@ export class Scheduler {
 				const path = World.genPath(worker.pos, task.job.pos);
 				if (!path) {
 					// TODO: Path is now obstructed, find alternative
-					throw new Error("TODO");
+					console.error("Path obstructed");
+					continue;
 				}
 				task.path = path;
-				worker.setMovement(path.next, Tile.at(worker.pos).getWalkCost());
+				worker.setMovement(path.nextDir(), Tile.at(worker.pos).getWalkCost());
 			}
 		}
 		if (this.unassigned.length > 0 && free.size > 0) {
 			const workers = [...free];
-			const paths = World.genPaths(workers.map(w => w.pos), this.unassigned.map(j => j.pos));
+			const jobPositions = this.unassigned.map(j => j.pos);
 
 			let associations: { worker: Worker, job: Job, path: Path }[] = [];
 
 			for (const worker of workers) {
-				const my_paths = paths.get(worker.pos);
-				if (!my_paths) {
-					throw new Error("Worker in invalid Pos");
-				}
+				const my_paths = World.genPaths(worker.pos, jobPositions);
+
 				for (const job of this.unassigned) {
 					const path = my_paths.get(job.pos);
 					if (path && Scheduler.checkRequirements(job.requirements, worker)) {
@@ -107,7 +106,7 @@ export class Scheduler {
 					}
 				}
 			}
-			associations.sort((a, b) => a.path.length - b.path.length);
+			associations.sort((a, b) => a.path.cost - b.path.cost);
 
 			while (associations.length > 0) {
 				const min = associations.splice(0, 1)[0];

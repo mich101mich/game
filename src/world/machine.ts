@@ -6,7 +6,7 @@ import { Rect } from "../geometry/rect";
 import { Option, Selectable } from "../menu";
 import { Scheduler } from "../scheduler";
 import { ItemType } from "./item";
-import { Tile, TileType } from "./tile";
+import { Tile, Material } from "./tile";
 import { Symbol, World } from "./world";
 
 export enum MachineType {
@@ -83,9 +83,9 @@ export class Machine implements Selectable {
 		}
 
 		if (type == MachineType.Platform) {
-			Game.place(pos, TileType.Platform);
+			Game.place(pos, Material.Platform);
 		} else {
-			Game.place(pos, TileType.Machine);
+			Game.place(pos, Material.Machine);
 		}
 	}
 
@@ -130,7 +130,7 @@ export class Machine implements Selectable {
 				const result = this.options.result || MachineType.Spawn;
 				delete this.options.result;
 				if (result == MachineType.Platform) {
-					Game.place(this.pos, TileType.Platform);
+					Game.place(this.pos, Material.Platform);
 				}
 				this.type = result;
 				if (this.conducts() && this.givesPower()) {
@@ -229,7 +229,7 @@ export class Machine implements Selectable {
 				name: "Destroy",
 				callback: () => {
 					this.parent.removeMachine(this);
-					Game.place(this.pos, TileType.Debris);
+					Game.place(this.pos, Material.Debris);
 					return true;
 				},
 			}

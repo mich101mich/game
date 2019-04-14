@@ -1,4 +1,5 @@
-use super::{HPAMap, Material};
+use super::Material;
+use crate::HPAMap;
 
 pub type Materials = Vec<Vec<Material>>;
 pub type Visible = Vec<Vec<bool>>;
@@ -26,7 +27,7 @@ pub struct MazeData {
 	pub height: usize,
 	pub materials: Materials,
 	pub visible: Visible,
-	pub hpa_map: HPAMap,
+	pub hpa_map: Option<HPAMap>,
 }
 
 impl MazeData {
@@ -46,11 +47,8 @@ impl MazeData {
 			height,
 			materials,
 			visible,
-			hpa_map: HPAMap::empty(),
+			hpa_map: None,
 		}
-	}
-	pub fn gen_hpa_map(&mut self) {
-		self.hpa_map = HPAMap::new(self.width, self.height, &mut self.materials);
 	}
 }
 

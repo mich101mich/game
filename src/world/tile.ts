@@ -3,12 +3,12 @@ import { TilePos } from "../geometry/pos";
 import { Rect } from "../geometry/rect";
 import { Job } from "../job";
 import { Option, Selectable } from "../menu";
-import { Wasm } from "../wasm";
 import { ItemType } from "./item";
 import { BUILD_COSTS, Machine, MachineType } from "./machine";
+import { Wasm } from "../main";
 
 
-export enum TileType {
+export enum Material {
 	Air,
 	Bedrock,
 	Granite,
@@ -30,7 +30,7 @@ export class Tile implements Selectable {
 			this.pos.toGamePos(),
 			this.pos.plus(1, 1).toGamePos());
 	}
-	get type(): TileType {
+	get type(): Material {
 		return Tile.wasm.get(this.pos.x, this.pos.y);
 	}
 	getData() {
@@ -59,7 +59,7 @@ export class Tile implements Selectable {
 		return this.rect;
 	}
 	getDescription(): string {
-		return `${TileType[this.type]}`;
+		return `${Material[this.type]}`;
 	}
 	getInfo(): string {
 		return ``;
@@ -85,14 +85,14 @@ export class Tile implements Selectable {
 									}
 								},
 							},
-							() => Game.place(tile.pos, TileType.Debris)
+							() => Game.place(tile.pos, Material.Debris)
 						);
 						Game.scheduler.addJob(job);
 					}
 					return true;
 				},
 			});
-		} else if (this.type == TileType.Air) {
+		} else if (this.type == Material.Air) {
 			BUILD_COSTS
 				.map((data, type) => ({ data, type: type as MachineType }))
 				.filter(d => d.data.buildable)

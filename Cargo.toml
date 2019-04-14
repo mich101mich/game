@@ -2,6 +2,7 @@
 name = "game"
 version = "0.1.0"
 authors = ["mich101mich <mich101mich@gmail.com>"]
+edition = "2018"
 
 [lib]
 name = "game"
@@ -9,3 +10,14 @@ path = "game.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+hierarchical_pathfinding = "0.2.0"
+serde = "1.0.90"
+serde_derive = "1.0.90"
+
+[dependencies.wasm-bindgen]
+version = "=0.2.42"
+features = ["serde-serialize"]
+
+[dependencies.rand]
+version = "0.6.5"
+features = ["wasm-bindgen"]

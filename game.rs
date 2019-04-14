@@ -1,5 +1,33 @@
+#![allow(clippy::needless_range_loop)]
+
+#[macro_use]
+extern crate serde_derive;
+
+use hierarchical_pathfinding::prelude::*;
+use rand::Rng;
+use wasm_bindgen::prelude::*;
+
+use std::collections::HashMap;
+
 mod rust_src;
 use rust_src::*;
+
+type HPAMap = PathCache<ManhattanNeighborhood>;
+
+#[derive(Serialize)]
+struct Path {
+	path: Vec<Point>,
+	cost: usize,
+}
+fn serialize(
+	path: hierarchical_pathfinding::AbstractPath<ManhattanNeighborhood>,
+) -> Path {
+	let cost = path.cost();
+	Path {
+		path: path.map(Point::from).collect(),
+		cost,
+	}
+}
 
 static mut WIDTH: usize = 0;
 static mut HEIGHT: usize = 0;
@@ -10,24 +38,16 @@ static mut MAZE: Maze = Maze {
 	data: None,
 };
 
-#[allow(dead_code)]
+#[wasm_bindgen]
 extern "C" {
-	fn log_str(ptr: usize, len: usize);
-	fn err_str(ptr: usize, len: usize);
-	fn random() -> f64;
+	#[wasm_bindgen(js_namespace = console)]
+	fn log(s: &str);
 }
 
-#[allow(dead_code)]
-pub fn log(s: &str) {
-	unsafe { log_str(s.as_ptr() as usize, s.len()) }
-}
-#[allow(dead_code)]
-fn err(s: &str) {
-	unsafe { err_str(s.as_ptr() as usize, s.len()) }
-}
-#[allow(dead_code)]
-fn print_error(info: &std::panic::PanicInfo) {
-	err(&format!("{}", info))
+macro_rules! log {
+	( $( $x:expr ),* ) => {
+		log(&format!($($x),*))
+	};
 }
 
 pub fn width() -> usize {
@@ -37,9 +57,6 @@ pub fn height() -> usize {
 	unsafe { HEIGHT }
 }
 
-fn maze_data() -> &'static mut MazeData {
-	unsafe { &mut MAZE }
-}
 fn materials() -> &'static mut Materials {
 	unsafe { &mut MAZE.materials }
 }
@@ -47,15 +64,24 @@ fn visible() -> &'static mut Visible {
 	unsafe { &mut MAZE.visible }
 }
 fn hpa_map() -> &'static mut HPAMap {
-	unsafe { &mut MAZE.hpa_map }
+	unsafe { MAZE.hpa_map.as_mut().unwrap() }
 }
 
-#[no_mangle]
+fn cost_fn((x, y): (usize, usize)) -> isize {
+	let material = get(x, y);
+	if material.is_solid() {
+		-1
+	} else {
+		material.walk_cost() as isize
+	}
+}
+
+#[wasm_bindgen]
 pub fn get(x: usize, y: usize) -> Material {
 	materials()[x][y]
 }
 
-#[no_mangle]
+#[wasm_bindgen]
 pub fn set(x: usize, y: usize, value: Material) {
 	let materials = materials();
 	let old = materials[x][y];
@@ -63,108 +89,61 @@ pub fn set(x: usize, y: usize, value: Material) {
 	if old.is_solid() != value.is_solid()
 		|| (!old.is_solid() && old.walk_cost() != value.walk_cost())
 	{
-		hpa_map().tile_changed(Point::new(x, y), materials);
+		hpa_map().tiles_changed(&[(x, y)], cost_fn);
 	}
 }
 
-#[no_mangle]
+#[wasm_bindgen]
+/// checks if a tile is solid
 pub fn is_solid(x: usize, y: usize) -> bool {
 	get(x, y).is_solid()
 }
 
-#[no_mangle]
-pub fn walk_cost(x: usize, y: usize) -> Cost {
+#[wasm_bindgen]
+/// gets the walk cost of a tile
+pub fn walk_cost(x: usize, y: usize) -> isize {
 	get(x, y).walk_cost()
 }
 
-#[no_mangle]
-pub fn find_path(sx: usize, sy: usize, ex: usize, ey: usize) -> i32 {
+#[wasm_bindgen]
+/// generates a Path from start to end
+pub fn find_path(sx: usize, sy: usize, ex: usize, ey: usize) -> JsValue {
 	let start = Point::new(sx, sy);
 	let end = Point::new(ex, ey);
 
-	if start == end {
-		return (0 << 2) | Dir::NONE as i32 & 0b11;
-	}
-
-	let materials = materials();
-
 	// use Hierarchical Pathfinding for existence check and long range approximation
-	let path = hpa_map().path_find(start, end, materials);
+	let path = hpa_map().find_path(start.into(), end.into(), cost_fn);
 
 	if let Some(path) = path {
-		let dir = path[0].get_dir_to(path[1]);
-		let cost = path.cost as i32;
-
-		if path.cost > CHUNK_SIZE as Cost * Material::Air.walk_cost() * 2 {
-			return (cost << 2) | dir as i32 & 0b11;
-		}
+		JsValue::from_serde(&serialize(path)).unwrap()
 	} else {
-		return -1;
-	}
-
-	let get_all_neighbors = |p: Point| p.neighbors();
-
-	let get_cost = |p: Point, _: Point| materials[p.x][p.y].walk_cost();
-
-	let is_walkable = |p: Point| !materials[p.x][p.y].is_solid();
-
-	let result = a_star_search(get_all_neighbors, get_cost, is_walkable, start, end, |p| {
-		p.dist(&end) as Cost
-	});
-
-	if let Some(path) = result {
-		let dir = path[0].get_dir_to(path[1]);
-		let cost = path.cost as i32;
-
-		(cost << 2) | dir as i32 & 0b11
-	} else {
-		-1
+		JsValue::null()
 	}
 }
 
-#[no_mangle]
-pub fn add_flood_goal(x: usize, y: usize) {
-	hpa_map().add_flood_goal(Point::new(x, y), materials());
-}
-#[no_mangle]
-pub fn flood_search(sx: usize, sy: usize) {
-	hpa_map().flood_search(Point::new(sx, sy), materials());
-}
-#[no_mangle]
-pub fn flood_path_to(ex: usize, ey: usize) -> i32 {
-	let hpa_map = hpa_map();
-	let end = Point::new(ex, ey);
+#[wasm_bindgen]
+pub fn find_paths(sx: usize, sy: usize, goals: JsValue) -> JsValue {
+	let goals: Vec<Point> = goals.into_serde().expect("Invalid JsValue");
+	let goals: Vec<(usize, usize)> = goals.into_iter().map(|p| (p.x, p.y)).collect();
 
-	let end_id = hpa_map.link_at(end).expect("Invalid Goal");
+	let paths = hpa_map().find_paths((sx, sy), &goals, cost_fn);
 
-	if end_id == hpa_map.flood_start {
-		return (0 << 2) | Dir::NONE as i32 & 0b11;
+	let mut ret: HashMap<String, Path> = HashMap::new();
+	for ((x, y), path) in paths {
+		ret.insert(format!("{}:{}", x, y), serialize(path));
 	}
-
-	let result = hpa_map.flood_path_to(end_id);
-	if let Some(path) = result {
-		let dir = path[0].get_dir_to(path[1]);
-		let cost = path.cost as i32;
-
-		(cost << 2) | dir as i32 & 0b11
-	} else {
-		-1
-	}
-}
-#[no_mangle]
-pub fn end_flood_search() {
-	hpa_map().end_flood_search();
+	JsValue::from_serde(&ret).unwrap()
 }
 
-#[no_mangle]
+#[wasm_bindgen]
 pub fn is_visible(x: usize, y: usize) -> bool {
 	visible()[x][y]
 }
 
-#[no_mangle]
+#[wasm_bindgen]
 pub fn set_visible(vx: usize, vy: usize) {
 	let mut next = vec![(vx, vy)];
-	let ref mut visible = visible();
+	let visible = &mut visible();
 
 	while let Some((x, y)) = next.pop() {
 		visible[x][y] = true;
@@ -186,36 +165,58 @@ pub fn set_visible(vx: usize, vy: usize) {
 	}
 }
 
-fn rand_range(min: f64, max: f64) -> f64 {
-	unsafe { random() * (max - min) + min }
+// ========================================== Debug Info ==========================================
+
+#[wasm_bindgen]
+pub fn chunk_size() -> usize {
+	hpa_map().config().chunk_size
 }
 
-fn rand_x() -> usize {
-	(unsafe { random() } * width() as f64) as usize
+#[wasm_bindgen]
+pub fn node_positions() -> JsValue {
+	let ret: Vec<Point> = hpa_map()
+		.inspect_nodes()
+		.map(|n| n.pos())
+		.map(Point::from)
+		.collect();
+
+	JsValue::from_serde(&ret).unwrap()
+}
+#[wasm_bindgen]
+pub fn node_neighbors(index: usize) -> JsValue {
+	let ret: Vec<Point> = hpa_map()
+		.inspect_nodes()
+		.nth(index)
+		.unwrap()
+		.connected()
+		.map(|c| c.pos())
+		.map(Point::from)
+		.collect();
+
+	JsValue::from_serde(&ret).unwrap()
 }
 
-fn rand_y() -> usize {
-	(unsafe { random() } * height() as f64) as usize
-}
+// =========================================== Game gen ===========================================
 
-#[no_mangle]
+#[wasm_bindgen]
+/// initializes the area. Please only call once!
 pub fn init(width: usize, height: usize) {
-	std::panic::set_hook(Box::new(print_error));
-
 	unsafe {
 		WIDTH = width;
 		HEIGHT = height;
-		MAZE = Maze::new(WIDTH, HEIGHT);
+		MAZE = Maze::new(width, height);
 	}
+
+	let mut rng = rand::thread_rng();
 
 	let materials = materials();
 
 	let min = width as f64 * height as f64 / 256.0;
 	let max = width as f64 * height as f64 / 200.0;
-	let cave_count = rand_range(min, max) as usize;
+	let cave_count = rng.gen_range(min, max) as usize;
 	for _ in 0..cave_count {
-		let x = rand_x();
-		let y = rand_y();
+		let x = rng.gen_range(0, width);
+		let y = rng.gen_range(0, height);
 		materials[x][y] = Air;
 	}
 
@@ -251,10 +252,10 @@ pub fn init(width: usize, height: usize) {
 
 	let min = width as f64 * height as f64 / 64.0;
 	let max = width as f64 * height as f64 / 48.0;
-	let ore_count = rand_range(min, max) as i32;
+	let ore_count = rng.gen_range(min, max) as i32;
 	for _ in 0..ore_count {
-		let x = rand_x();
-		let y = rand_y();
+		let x = rng.gen_range(0, width);
+		let y = rng.gen_range(0, height);
 		if materials[x][y] == Rock {
 			materials[x][y] = Ore;
 		}
@@ -265,10 +266,10 @@ pub fn init(width: usize, height: usize) {
 
 	let min = width as f64 * height as f64 / 80.0;
 	let max = width as f64 * height as f64 / 64.0;
-	let ore_count = rand_range(min, max) as i32;
+	let ore_count = rng.gen_range(min, max) as i32;
 	for _ in 0..ore_count {
-		let x = rand_x();
-		let y = rand_y();
+		let x = rng.gen_range(0, width);
+		let y = rng.gen_range(0, height);
 		if materials[x][y] == Rock {
 			materials[x][y] = Crystal;
 		}
@@ -288,78 +289,16 @@ pub fn init(width: usize, height: usize) {
 
 	set_visible(width / 2, height / 2);
 
-	maze_data().gen_hpa_map();
+	unsafe {
+		MAZE.hpa_map = Some(HPAMap::new(
+			(width, height),
+			crate::cost_fn,
+			ManhattanNeighborhood::new(width, height),
+			Default::default(),
+		));
+	}
 
-	log("WebAssembly backend ready");
-}
-
-#[no_mangle]
-pub fn gen_hpa_map() {
-	maze_data().gen_hpa_map();
-}
-#[no_mangle]
-pub fn chunk_size(layer: usize) -> usize {
-	get_chunk_size(layer)
-}
-
-static mut CURRENT_LINK_INDEX: i32 = -1;
-static mut CURRENT_LINK_EDGE: i32 = -1;
-
-unsafe fn current_link() -> &'static rust_src::hpa::Link {
-	let mut links = hpa_map().links.values();
-	links.nth(CURRENT_LINK_INDEX as usize).unwrap()
-}
-unsafe fn other_link() -> &'static rust_src::hpa::Link {
-	let other = current_link().paths.keys().nth(CURRENT_LINK_EDGE as usize).unwrap();
-	hpa_map().links.get(&other).unwrap()
-}
-unsafe fn other_link_cost() -> Cost {
-	let path = current_link().paths.values().nth(CURRENT_LINK_EDGE as usize).unwrap();
-	path.cost
-}
-
-#[no_mangle]
-pub unsafe fn iter_links() {
-	CURRENT_LINK_INDEX = -1;
-	CURRENT_LINK_EDGE = -1;
-}
-#[no_mangle]
-pub unsafe fn link_x() -> usize {
-	current_link().pos.x
-}
-#[no_mangle]
-pub unsafe fn link_y() -> usize {
-	current_link().pos.y
-}
-#[no_mangle]
-pub unsafe fn link_id() -> usize {
-	current_link().id
-}
-#[no_mangle]
-pub unsafe fn next_link() -> bool {
-	CURRENT_LINK_INDEX += 1;
-	CURRENT_LINK_EDGE = -1;
-
-	CURRENT_LINK_INDEX < hpa_map().links.len() as i32
-}
-
-#[no_mangle]
-pub unsafe fn connection_x() -> usize {
-	other_link().pos.x
-}
-#[no_mangle]
-pub unsafe fn connection_y() -> usize {
-	other_link().pos.y
-}
-#[no_mangle]
-pub unsafe fn connection_cost() -> Cost {
-	other_link_cost()
-}
-#[no_mangle]
-pub unsafe fn next_connection() -> bool {
-	CURRENT_LINK_EDGE += 1;
-	let link = current_link();
-	CURRENT_LINK_EDGE < link.paths.len() as i32
+	log!("WebAssembly backend ready");
 }
 
 fn grow(material: Material, src: Material, neighbor: Material, odd_increase: f64) {
@@ -384,7 +323,7 @@ fn grow(material: Material, src: Material, neighbor: Material, odd_increase: f64
 			if y < height() - 1 && materials[x][y + 1] == neighbor {
 				odds += odd_increase;
 			}
-			if unsafe { random() } <= odds {
+			if rand::random::<f64>() <= odds {
 				changes.push((x, y));
 			}
 		}

@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
 	entry: './src/main.ts',
 	module: {
@@ -10,11 +12,13 @@ module.exports = {
 		]
 	},
 	resolve: {
-		extensions: ['.tsx', '.ts', '.js']
+		extensions: ['.tsx', '.ts', '.js', '.wasm']
 	},
 	output: {
-		filename: './index.js',
-		path: __dirname,
+		path: path.resolve(__dirname),
+		filename: 'dist/bundle.js',
+		chunkFilename: 'dist/chunk.bundle.js',
+		webassemblyModuleFilename: 'dist/bundle.wasm'
 	},
 	mode: 'production'
 };

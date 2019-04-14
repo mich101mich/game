@@ -1,5 +1,6 @@
-use rust_src::Cost;
+use wasm_bindgen::prelude::wasm_bindgen;
 
+#[wasm_bindgen]
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Material {
@@ -14,15 +15,15 @@ pub enum Material {
 	Machine,
 }
 impl Material {
-	pub fn is_solid(&self) -> bool {
-		*self != Material::Air && *self != Material::Platform && *self != Material::Debris
+	pub fn is_solid(self) -> bool {
+		self != Material::Air && self != Material::Platform && self != Material::Debris
 	}
-	pub fn walk_cost(&self) -> Cost {
+	pub fn walk_cost(self) -> isize {
 		match self {
-			&Air => 2,
-			&Platform => 1,
-			&Debris => 4,
-			_ => panic!("Called walk_cost() on a solid tile"),
+			Air => 2,
+			Platform => 1,
+			Debris => 4,
+			_ => -1, // solid
 		}
 	}
 }

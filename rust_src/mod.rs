@@ -12,12 +12,3 @@ pub use self::point::Point;
 
 mod maze;
 pub use self::maze::*;
-
-pub mod hpa;
-pub use self::hpa::*;
-
-mod utils;
-pub use self::utils::*;
-
-mod path;
-pub use self::path::*;

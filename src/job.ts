@@ -1,12 +1,12 @@
 
 import { TilePos } from "./geometry/pos";
 import { ItemType } from "./world/item";
-import { TileType } from "./world/tile";
 import { Worker } from "./world/worker";
+import { Material } from "./world/tile";
 
 export interface TileRequirement {
 	pos: TilePos,
-	type?: TileType | TileType[],
+	type?: Material | Material[],
 	solid?: boolean,
 }
 

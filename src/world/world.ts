@@ -2,9 +2,9 @@
 import { Path } from "../geometry/path";
 import { Dir, TilePos } from "../geometry/pos";
 import { Rect } from "../geometry/rect";
-import { Wasm } from "../wasm";
 import { MachineType } from "./machine";
-import { TileType } from "./tile";
+import { Material } from "./tile";
+import { Wasm, RustPoint, RustPath } from "../main";
 
 export enum Symbol {
 	LowPower = 0,
@@ -26,7 +26,7 @@ export class World {
 		ignoreVisibility: false,
 	};
 
-	static init(wasm: Wasm, assets: ImageBitmap) {
+	static init(wasm: any, assets: ImageBitmap) {
 		World.wasm = wasm;
 		World.assets = assets;
 
@@ -39,7 +39,7 @@ export class World {
 
 	}
 
-	static place(pos: TilePos, material: TileType) {
+	static place(pos: TilePos, material: Material) {
 		World.wasm.set(pos.x, pos.y, material);
 		World.wasm.set_visible(pos.x, pos.y);
 		World.needsDrawing = true;
@@ -67,14 +67,14 @@ export class World {
 				if (ignoreVis || World.wasm.is_visible(pos.x, pos.y)) {
 					context.fillRect(pos.x * World.tileSize, pos.y * World.tileSize, World.tileSize, World.tileSize);
 					const n = World.wasm.get(pos.x, pos.y) as number;
-					if (World.wasm.get(pos.x, pos.y) == TileType.Platform) {
+					if (World.wasm.get(pos.x, pos.y) == Material.Platform) {
 						const variant = [0, 1, 2, 3].map(dir => {
 							const other = pos.getInDir(dir as Dir);
 							if (!other.isValid()) {
 								return false;
 							}
 							const type = World.wasm.get(other.x, other.y);
-							return type == TileType.Platform || type == TileType.Machine;
+							return type == Material.Platform || type == Material.Machine;
 						})
 							.map(hasNeighbor => hasNeighbor ? 1 : 0)
 							.reduceRight((prev, curr) => (prev << 1) | curr, 0);
@@ -101,46 +101,38 @@ export class World {
 			context.lineTo(x * World.tileSize, World.canvas.height);
 		}
 		context.stroke();
-		const colors = ["black"];
-		for (let i = 1; i < chunkSize * 4; i++) {
-			let percent = i / (chunkSize * 4);
-			colors.push("rgb(" + (percent * 255) + ", " + (255 - percent * 255) + ", 0)")
-		}
-		World.wasm.iter_links();
-		let linkCount = 0, connectionCount = 0;
 
-		while (World.wasm.next_link()) {
-			linkCount++;
+		const positions = World.wasm.node_positions() as RustPoint[];
+		let connectionCount = 0;
 
-			const x = World.wasm.link_x();
-			const y = World.wasm.link_y();
-			const id = World.wasm.link_id();
+		for (let i = 0; i < positions.length; i++) {
+
+			const pos = positions[i];
 
 			context.strokeStyle = "red";
-			context.strokeRect(x * World.tileSize + 1, y * World.tileSize + 1, World.tileSize - 2, World.tileSize - 2);
+			context.strokeRect(pos.x * World.tileSize + 1, pos.y * World.tileSize + 1, World.tileSize - 2, World.tileSize - 2);
 
 			if (World.debugParams.edges) {
-				while (World.wasm.next_connection()) {
-					connectionCount++;
+				const neighbors = World.wasm.node_neighbors(i) as RustPoint[];
+				connectionCount += neighbors.length;
 
-					const cx = World.wasm.connection_x();
-					const cy = World.wasm.connection_y();
-					const cost = World.wasm.connection_cost();
-					context.strokeStyle = colors[cost];
+				for (let n = 0; n < neighbors.length; n++) {
+					const neighbor = neighbors[n]
+
+					context.strokeStyle = "green";
 					context.beginPath();
-					context.moveTo((x + 0.5) * World.tileSize, (y + 0.5) * World.tileSize);
-					const midX = ((x + 0.5) + (cx + 0.5)) / 2;
-					const midY = ((y + 0.5) + (cy + 0.5)) / 2;
+					context.moveTo((pos.x + 0.5) * World.tileSize, (pos.y + 0.5) * World.tileSize);
+					const midX = ((pos.x + 0.5) + (neighbor.x + 0.5)) / 2;
+					const midY = ((pos.y + 0.5) + (neighbor.y + 0.5)) / 2;
 					context.lineTo(midX * World.tileSize, midY * World.tileSize);
 					context.stroke();
 				}
 			}
-
-			//context.strokeStyle = "blue";
-			//context.strokeText(id.toString(), x * World.tileSize, (y + 1) * World.tileSize);
 		}
-		console.log("Links: ", linkCount);
-		console.log("Connections: ", connectionCount);
+		console.log("Links: ", positions.length);
+		if (World.debugParams.edges) {
+			console.log("Connections: ", connectionCount);
+		}
 		target.drawImage(World.canvas, 0, 0);
 	}
 
@@ -157,57 +149,32 @@ export class World {
 	 * @param end the end Point
 	 */
 	static genPath(start: TilePos, end: TilePos): Path | null {
-		if (start.x == end.x && start.y == end.y) {
-			return new Path(start, end, 0, Dir.NONE);
-		}
 		if (!start.isValid() || !end.isValid()) {
 			return null;
 		}
-		let length = World.wasm.find_path(start.x, start.y, end.x, end.y);
-		if (length < 0) {
+		const path = World.wasm.find_path(start.x, start.y, end.x, end.y) as RustPath | null;
+		if (path) {
+			return new Path(path);
+		} else {
 			return null;
 		}
-		const nextDir = length & 0b11;
-		length = length >> 2;
-		return new Path(start, end, length, nextDir);
 	}
 
-	static genPaths(starts: TilePos[], ends: TilePos[]): Map<TilePos, Map<TilePos, Path>> {
-		if (starts.length == 0 || ends.length == 0) {
+	static genPaths(start: TilePos, ends: TilePos[]): Map<TilePos, Path> {
+		if (ends.length == 0) {
 			return new Map();
 		}
-		const new_ends = ends.map(end => end.isValid() ? end : null);
-		const new_starts = starts.map(start => start.isValid() ? start : null);
-		for (const end of new_ends) {
-			if (end) {
-				World.wasm.add_flood_goal(end.x, end.y);
+		const paths = World.wasm.find_paths(start.x, start.y, ends) as { [name: string]: RustPath };
+		const ret = new Map<TilePos, Path>();
+
+		for (const end of ends) {
+			const name = end.x + ":" + end.y;
+			if (name in paths) {
+				ret.set(end, new Path(paths[name]));
 			}
 		}
-		const paths = new Map();
-		for (const start of new_starts) {
-			if (!start) {
-				continue;
-			}
-			const current_paths = new Map<TilePos, Path>();
 
-			World.wasm.flood_search(start.x, start.y);
-			for (const end of new_ends) {
-				if (!end) {
-					continue;
-				}
-				const result = World.wasm.flood_path_to(end.x, end.y);
-				if (result == -1) {
-					continue;
-				}
-				const nextDir = result & 0b11;
-				const length = result >> 2;
-				current_paths.set(end, new Path(start, end, length, nextDir));
-			}
-
-			paths.set(start, current_paths);
-		}
-		World.wasm.end_flood_search();
-		return paths;
+		return ret;
 	}
 
 	static revealWorld() {

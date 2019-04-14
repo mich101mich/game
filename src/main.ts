@@ -7,37 +7,23 @@ window["Game"] = Game;
 //@ts-ignore
 window["World"] = World;
 
-//@ts-ignore
-let decoder = new TextDecoder("utf-8");
-
-let memory: { buffer: ArrayBuffer };
-
-const importObject = {
-	env: {
-		random: Math.random,
-		log_str: function (ptr: number, len: number) {
-			const slice = memory.buffer.slice(ptr, ptr + len);
-			console.log(decoder.decode(slice));
-		},
-		err_str: function (ptr: number, len: number) {
-			const slice = memory.buffer.slice(ptr, ptr + len);
-			console.error(decoder.decode(slice));
-		},
-	}
-};
-
-const getWasm = fetch("lib.wasm")
-	.then(file => file.arrayBuffer())
-	// @ts-ignore
-	.then(buffer => WebAssembly.instantiate(buffer, importObject))
-	.then(result => result.instance.exports);
+export type Wasm = typeof import("./bindgen/wasm");
+export type RustPoint = {
+	x: number,
+	y: number,
+}
+export type RustPath = {
+	path: RustPoint[],
+	cost: number,
+}
 
 const assets = new Promise(
 	(resolve, reject) => window.addEventListener("load", resolve))
 	.then(() => createImageBitmap(document.getElementById("assets") as HTMLImageElement));
 
+const getWasm = import("./bindgen/wasm");
+
 Promise.all([assets, getWasm]).then(([assets, wasm]) => {
-	memory = wasm.memory;
 	Game.init(wasm, assets);
 })
 
